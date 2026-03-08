@@ -8,6 +8,7 @@
 - GitHub-repo finns på `https://github.com/DanielWarg/worktemp`
 - CI/CD-grund är tillagd via GitHub Actions
 - Repo-säkerhet är förstärkt med secret-guardrails, PR-mall och workflow-dokumentation
+- GitHub-repoinställningar är delvis konfigurerade direkt remote
 
 ## Etablerade antaganden
 
@@ -50,12 +51,38 @@
   - `VERCEL_ORG_ID`
   - `VERCEL_PROJECT_ID`
 
+## GitHub-inställningar som redan är applicerade
+
+- `main` är branch-protected
+- Obligatoriska checks:
+  - `repo-hygiene`
+  - `node-ci`
+- PR-krav:
+  - minst 1 approval
+  - code owner review krävs
+  - stale reviews avfärdas vid ny push
+  - conversations måste vara lösta
+- Historik:
+  - linear history krävs
+  - force push är avstängt
+  - branch delete är avstängt
+- Merge policy:
+  - squash merge tillåtet
+  - merge commits avstängda
+  - rebase merge avstängt
+  - branch raderas automatiskt efter merge
+- Säkerhetsfunktioner:
+  - GitHub secret scanning är aktiverat
+  - GitHub push protection är aktiverat
+  - Dependabot security updates är aktiverat
+
 ## Repo policy att behålla
 
 - `main` ska vara skyddad
 - Allt arbete ska gå via branch + PR
 - Squash merge är önskat defaultflöde
 - `STATUS.md` ska uppdateras när arkitektur, workflow eller driftförutsättningar ändras
+- Om branch protection eller GitHub-secrets ändras ska det dokumenteras här direkt
 
 ## Rekommenderad startsekvens
 
