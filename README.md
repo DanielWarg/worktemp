@@ -10,6 +10,8 @@ Se följande filer först:
 - `PLAN.md` för produkt- och leveransplan
 - `STATUS.md` för nuläge och rekommenderad startordning
 - `AGENTS.md` för repo-specifika arbetsregler
+- `docs/GIT_WORKFLOW.md` för branch-, PR- och deployflöde
+- `SECURITY.md` för regler kring hemligheter och frontend/backend-exponering
 
 ## Modul 1 i korthet
 
@@ -60,3 +62,12 @@ Ingår inte:
 ## Nästa praktiska steg
 
 Skapa appen och börja med fundament enligt `STATUS.md`.
+
+## CI/CD
+
+Repo:t har nu GitHub Actions för:
+- CI på PR och push till `main`
+- preview-deploy till Vercel på PR när appen finns
+- production-deploy till Vercel på push till `main`
+
+Deploy-workflows är medvetet skyddade och skippar tills repo:t faktiskt innehåller en app med `package.json`.

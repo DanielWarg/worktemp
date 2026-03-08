@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  repo-hygiene:
+    name: repo-hygiene
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate repo hygiene and secret guardrails
+        run: ./scripts/ci/validate-no-secrets.sh
+
+  node-ci:
+    name: node-ci
+    runs-on: ubuntu-latest
+    needs:
+      - repo-hygiene
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run install, lint, typecheck, test and build when app exists
+        run: ./scripts/ci/run-node-checks.sh

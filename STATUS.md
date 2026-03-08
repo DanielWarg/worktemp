@@ -5,6 +5,9 @@
 - `PLAN.md` genomläst och används som källplan
 - Projektets grundfiler skapade
 - Ingen kodbas eller app-scaffold finns ännu
+- GitHub-repo finns på `https://github.com/DanielWarg/worktemp`
+- CI/CD-grund är tillagd via GitHub Actions
+- Repo-säkerhet är förstärkt med secret-guardrails, PR-mall och workflow-dokumentation
 
 ## Etablerade antaganden
 
@@ -13,6 +16,46 @@
 - Canvasen ska vara semi-strukturerad
 - Filuppladdning hålls enkel i första versionen
 - AI-funktioner förbereds i datamodellen men exponeras inte
+- Vercel används som deploy-mål när appen scaffoldats
+- GitHub Actions är primär CI/CD-motor
+
+## Implementerat i repo:t
+
+- `.github/workflows/ci.yml`
+  - kör `repo-hygiene` och `node-ci`
+- `.github/workflows/deploy-preview.yml`
+  - förberedd preview-deploy till Vercel på PR
+- `.github/workflows/deploy-production.yml`
+  - förberedd production-deploy till Vercel på `main`
+- `scripts/ci/validate-no-secrets.sh`
+  - blockerar vanliga läckor och förbjudna filer
+- `scripts/ci/run-node-checks.sh`
+  - kör install/lint/typecheck/test/build när appen finns
+- `.github/pull_request_template.md`
+  - tvingar checklista för säkerhet och handoff
+- `.github/CODEOWNERS`
+  - sätter ägarskap för repo:t
+- `docs/GIT_WORKFLOW.md`
+  - beskriver branch-strategi, merge-regler och deployflöde
+- `SECURITY.md`
+  - dokumenterar hur hemligheter ska hanteras
+
+## CI/CD-beteende just nu
+
+- CI kör redan på PR och push till `main`
+- Deploy-workflows skippar medvetet så länge `package.json` saknas
+- När appen scaffoldas kommer CI automatiskt börja köra Node-baserade steg
+- För deploy krävs GitHub-secrets:
+  - `VERCEL_TOKEN`
+  - `VERCEL_ORG_ID`
+  - `VERCEL_PROJECT_ID`
+
+## Repo policy att behålla
+
+- `main` ska vara skyddad
+- Allt arbete ska gå via branch + PR
+- Squash merge är önskat defaultflöde
+- `STATUS.md` ska uppdateras när arkitektur, workflow eller driftförutsättningar ändras
 
 ## Rekommenderad startsekvens
 
@@ -49,6 +92,8 @@
 - Exakt auth-provider-konfiguration
 - Om PostgreSQL körs lokalt först eller direkt mot Neon
 - Om filstorage ska vara AWS S3, Cloudflare R2 eller annan S3-kompatibel tjänst
+- Om preview-deploy även ska kommentera URL tillbaka till PR
+- Om Dependabot ska aktiveras för npm efter att appen scaffoldats
 
 ## Definition av redo
 
