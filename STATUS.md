@@ -4,7 +4,7 @@
 
 - `PLAN.md` genomläst och används som källplan
 - Projektets grundfiler skapade
-- Ingen kodbas eller app-scaffold finns ännu
+- Minimal Next.js 16-app är scaffoldad och deploybar
 - GitHub-repo finns på `https://github.com/DanielWarg/worktemp`
 - CI/CD-grund är tillagd via GitHub Actions
 - Repo-säkerhet är förstärkt med secret-guardrails, PR-mall och workflow-dokumentation
@@ -18,10 +18,21 @@
 - Filuppladdning hålls enkel i första versionen
 - AI-funktioner förbereds i datamodellen men exponeras inte
 - Vercel används som deploy-mål när appen scaffoldats
+- Vercel används som deploy-mål för den nya Next.js-appen
 - GitHub Actions är primär CI/CD-motor
 
 ## Implementerat i repo:t
 
+- `app/`
+  - App Router-grund med startsida, layout, workspace-shell och globala stilar
+- `app/api/health/route.ts`
+  - enkel health endpoint för deployverifiering
+- `components/workspace/workspace-shell.tsx`
+  - första klickbara produkt-UI med mockdata för team och personer
+- `package.json`
+  - Next.js 16, React 19, Tailwind 4, TypeScript och ESLint
+- `eslint.config.mjs`, `next.config.ts`, `postcss.config.mjs`, `tsconfig.json`
+  - bygg- och lintkonfiguration för webbappen
 - `.github/workflows/ci.yml`
   - kör `repo-hygiene` och `node-ci`
 - `.github/workflows/deploy-preview.yml`
@@ -44,12 +55,22 @@
 ## CI/CD-beteende just nu
 
 - CI kör redan på PR och push till `main`
-- Deploy-workflows skippar medvetet så länge `package.json` saknas
-- När appen scaffoldas kommer CI automatiskt börja köra Node-baserade steg
+- CI kör nu riktiga Node-baserade steg när lockfil och dependencies finns
+- Deploy-workflows skippar rent om Vercel-secrets inte är satta ännu
 - För deploy krävs GitHub-secrets:
   - `VERCEL_TOKEN`
   - `VERCEL_ORG_ID`
   - `VERCEL_PROJECT_ID`
+
+## Verifierat lokalt
+
+- `pnpm install`
+- `pnpm lint`
+- `pnpm typecheck`
+- `pnpm build`
+- `pnpm start`
+- `GET /api/health` returnerar `200` och JSON
+- `GET /workspace` returnerar `200`
 
 ## GitHub-inställningar som redan är applicerade
 
@@ -121,6 +142,14 @@
 - Om filstorage ska vara AWS S3, Cloudflare R2 eller annan S3-kompatibel tjänst
 - Om preview-deploy även ska kommentera URL tillbaka till PR
 - Om Dependabot ska aktiveras för npm efter att appen scaffoldats
+
+## Nästa byggsteg
+
+- Sätta upp Prisma-schema och första migrering
+- Lägga till auth-flöde med NextAuth.js
+- Bygga layout shell med topbar och canvas-yta
+- Introducera första domänmodellerna för workspace, team och person
+- Ersätta mockdata i `/workspace` med riktiga serverhämtade modeller
 
 ## Definition av redo
 

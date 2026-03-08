@@ -4,7 +4,7 @@ Grundrepo för Modul 1 av en SaaS-produkt där chefer och teamledare bygger upp 
 
 ## Status
 
-Repo:t innehåller just nu planering och projektfiler. Applikationen är inte scaffoldad ännu.
+Repo:t innehåller nu en deploybar Next.js-grund för webbappen samt projekt- och driftfiler.
 
 Se följande filer först:
 - `PLAN.md` för produkt- och leveransplan
@@ -21,6 +21,16 @@ Se följande filer först:
 - Personkort som kan organiseras inom och mellan team
 - Sidopanel för grundinfo, anteckningar och filer
 - Förberedd datamodell för framtida AI- och samarbetsfunktioner
+
+## Kom igång lokalt
+
+```bash
+pnpm install
+pnpm dev
+```
+
+Öppna `http://localhost:3000`. Health-check finns på `http://localhost:3000/api/health`.
+Första produktvyn finns på `http://localhost:3000/workspace`.
 
 ## Tekniska beslut från planen
 
@@ -70,4 +80,10 @@ Repo:t har nu GitHub Actions för:
 - preview-deploy till Vercel på PR när appen finns
 - production-deploy till Vercel på push till `main`
 
-Deploy-workflows är medvetet skyddade och skippar tills repo:t faktiskt innehåller en app med `package.json`.
+Deploy-workflows skippar rent om Vercel-secrets ännu inte är satta.
+
+## Första appyta
+
+Repo:t innehåller nu två deploybara rutter:
+- `/` för en produkt-/projektlandning
+- `/workspace` för första mockade app shell med teamcontainrar, personkort och detaljpanel
