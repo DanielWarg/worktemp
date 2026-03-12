@@ -1,376 +1,376 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { PersonData, TagData, WorkspaceData } from "./types";
+import { api, TEAM_COLORS } from "./helpers";
+import { CanvasView } from "./canvas-view";
+import { PersonDetailPanel } from "./person-detail-panel";
+import { MeetingCaptureView } from "./meeting-capture-view";
+import { PatternView } from "./pattern-view";
+import { HistoricalImportDialog } from "./historical-import-dialog";
+import { CrmSettingsView } from "./crm-settings-view";
+import { MeetingHistoryView } from "./meeting-history-view";
 
-type Note = {
-  id: string;
-  content: string;
-  createdAt: string;
-};
+/* ------------------------------------------------------------------ */
+/*  Hook                                                               */
+/* ------------------------------------------------------------------ */
 
-type FileItem = {
-  id: string;
-  name: string;
-  meta: string;
-  comment: string;
-};
+function useWorkspaceLoader(workspaceId: string) {
+  const [workspace, setWorkspace] = useState<WorkspaceData | null>(null);
+  const [loading, setLoading] = useState(true);
 
-type Person = {
-  id: string;
-  name: string;
-  role: string;
-  initials: string;
-  summary: string;
-  notes: Note[];
-  files: FileItem[];
-};
+  const reload = useCallback(async () => {
+    const data = await api<WorkspaceData>(`/api/workspaces/${workspaceId}`);
+    setWorkspace(data);
+    return data;
+  }, [workspaceId]);
 
-type Team = {
-  id: string;
-  name: string;
-  accent: string;
-  people: Person[];
-};
+  useEffect(() => {
+    let cancelled = false;
+    api<WorkspaceData>(`/api/workspaces/${workspaceId}`).then((data) => {
+      if (!cancelled) {
+        setWorkspace(data);
+        setLoading(false);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [workspaceId]);
 
-const teams: Team[] = [
-  {
-    id: "leadership",
-    name: "Ledningsgrupp",
-    accent: "bg-[var(--color-mint-400)]",
-    people: [
-      {
-        id: "daniel",
-        name: "Daniel Warg",
-        role: "Team lead",
-        initials: "DW",
-        summary:
-          "Äger workspace-strukturen och driver införandet av den visuella canvasen.",
-        notes: [
-          {
-            id: "note-1",
-            content: "Behöver kunna flytta personer mellan team utan att tappa anteckningar.",
-            createdAt: "8 mars 2026",
-          },
-          {
-            id: "note-2",
-            content: "Vill använda canvasen i onboarding för nya chefer.",
-            createdAt: "7 mars 2026",
-          },
-        ],
-        files: [
-          {
-            id: "file-1",
-            name: "team-brief.pdf",
-            meta: "PDF • 420 KB",
-            comment: "Kort brief som används vid första onboarding-sessionen.",
-          },
-        ],
-      },
-      {
-        id: "sara",
-        name: "Sara Nyström",
-        role: "Operations manager",
-        initials: "SN",
-        summary: "Säkrar arbetsflöden, ansvarsmappning och tydlighet mellan teamen.",
-        notes: [
-          {
-            id: "note-3",
-            content: "Behöver en snabb överblick innan veckans ledningsmöte.",
-            createdAt: "6 mars 2026",
-          },
-        ],
-        files: [],
-      },
-    ],
-  },
-  {
-    id: "delivery",
-    name: "Delivery",
-    accent: "bg-[var(--color-copper-400)]",
-    people: [
-      {
-        id: "leo",
-        name: "Leo Sand",
-        role: "Product designer",
-        initials: "LS",
-        summary: "Jobbar med de visuella mönstren för teamcontainrar och detaljpanelen.",
-        notes: [
-          {
-            id: "note-4",
-            content: "Behöver snabb preview av tomma tillstånd och onboarding-steg.",
-            createdAt: "5 mars 2026",
-          },
-        ],
-        files: [
-          {
-            id: "file-2",
-            name: "wireframes.fig",
-            meta: "FIG • 1.2 MB",
-            comment: "Tidiga skisser för canvas och sidopanel.",
-          },
-        ],
-      },
-      {
-        id: "mila",
-        name: "Mila Borg",
-        role: "Frontend engineer",
-        initials: "MB",
-        summary: "Bygger app shell, states och första deploybara frontendgrunden.",
-        notes: [],
-        files: [],
-      },
-    ],
-  },
-  {
-    id: "people",
-    name: "People & Support",
-    accent: "bg-white/75",
-    people: [
-      {
-        id: "ida",
-        name: "Ida Blom",
-        role: "People partner",
-        initials: "IB",
-        summary: "Fångar upp strukturbehov och ser till att persondata hanteras varsamt.",
-        notes: [
-          {
-            id: "note-5",
-            content: "Vill se tydlig skillnad mellan användarkonto och personkort i UI:t.",
-            createdAt: "4 mars 2026",
-          },
-        ],
-        files: [],
-      },
-    ],
-  },
-];
+  return { workspace, loading, reload };
+}
 
-export function WorkspaceShell() {
-  const [selectedPersonId, setSelectedPersonId] = useState("daniel");
+/* ------------------------------------------------------------------ */
+/*  Main component                                                     */
+/* ------------------------------------------------------------------ */
 
-  const selectedPerson =
-    teams.flatMap((team) => team.people).find((person) => person.id === selectedPersonId) ??
-    teams[0].people[0];
+type ViewMode = "canvas" | "meeting" | "patterns" | "crm" | "history";
+
+export function WorkspaceShell({ workspaceId }: { workspaceId: string }) {
+  const { workspace, loading, reload } = useWorkspaceLoader(workspaceId);
+  const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
+  const [newTeamName, setNewTeamName] = useState("");
+  const [newPeopleByTeam, setNewPeopleByTeam] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("canvas");
+  const [showImport, setShowImport] = useState(false);
+  const [allTags, setAllTags] = useState<TagData[]>([]);
+
+  /* -- Derived state ------------------------------------------------- */
+
+  const teams = useMemo(() => workspace?.teams ?? [], [workspace]);
+
+  const allPeople = useMemo(
+    () => teams.flatMap((t) => t.memberships.map((m) => ({ ...m.person, teamId: t.id }))),
+    [teams]
+  );
+
+  const selectedPerson = useMemo(
+    () => allPeople.find((p) => p.id === selectedPersonId) ?? null,
+    [allPeople, selectedPersonId]
+  );
+
+  const selectedTeam = useMemo(
+    () => teams.find((t) => t.memberships.some((m) => m.personId === selectedPersonId)) ?? null,
+    [teams, selectedPersonId]
+  );
+
+  // Load tags for the workspace
+  useEffect(() => {
+    if (!workspace) return;
+    let cancelled = false;
+    api<TagData[]>(`/api/tags?workspaceId=${workspace.id}`).then((data) => {
+      if (!cancelled) setAllTags(data);
+    });
+    return () => { cancelled = true; };
+  }, [workspace]);
+
+  /* -- Handlers ------------------------------------------------------ */
+
+  async function handleCreateTeam() {
+    const name = newTeamName.trim();
+    if (!name || !workspace) return;
+
+    setSaving(true);
+    await api("/api/teams", {
+      method: "POST",
+      body: JSON.stringify({
+        workspaceId: workspace.id,
+        name,
+        color: TEAM_COLORS[teams.length % TEAM_COLORS.length],
+      }),
+    });
+    setNewTeamName("");
+    await reload();
+    setSaving(false);
+  }
+
+  async function handleTeamNameChange(teamId: string, value: string) {
+    await api(`/api/teams/${teamId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ name: value || "Namnlöst team" }),
+    });
+  }
+
+  async function handleDeleteTeam(teamId: string) {
+    setSaving(true);
+    await api(`/api/teams/${teamId}`, { method: "DELETE" });
+    if (selectedTeam?.id === teamId) setSelectedPersonId(null);
+    await reload();
+    setSaving(false);
+  }
+
+  function handlePersonDraftChange(teamId: string, value: string) {
+    setNewPeopleByTeam((c) => ({ ...c, [teamId]: value }));
+  }
+
+  async function handleCreatePerson(teamId: string) {
+    const name = (newPeopleByTeam[teamId] ?? "").trim();
+    if (!name || !workspace) return;
+
+    setSaving(true);
+    const person = await api<PersonData>("/api/persons", {
+      method: "POST",
+      body: JSON.stringify({ workspaceId: workspace.id, teamId, name }),
+    });
+    setNewPeopleByTeam((c) => ({ ...c, [teamId]: "" }));
+    setSelectedPersonId(person.id);
+    await reload();
+    setSaving(false);
+  }
+
+  async function handleUpdatePerson(field: string, value: string) {
+    if (!selectedPerson) return;
+    await api(`/api/persons/${selectedPerson.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ [field]: value }),
+    });
+    await reload();
+  }
+
+  async function handleAddNote(content: string) {
+    if (!selectedPerson) return;
+    setSaving(true);
+    await api(`/api/persons/${selectedPerson.id}/notes`, {
+      method: "POST",
+      body: JSON.stringify({ content }),
+    });
+    await reload();
+    setSaving(false);
+  }
+
+  async function handleMoveSelectedPerson(targetTeamId: string) {
+    if (!selectedPerson || !selectedTeam || selectedTeam.id === targetTeamId) return;
+
+    setSaving(true);
+    await api(`/api/persons/${selectedPerson.id}/move`, {
+      method: "POST",
+      body: JSON.stringify({ fromTeamId: selectedTeam.id, toTeamId: targetTeamId }),
+    });
+    await reload();
+    setSaving(false);
+  }
+
+  async function handleDeleteSelectedPerson() {
+    if (!selectedPerson) return;
+
+    setSaving(true);
+    await api(`/api/persons/${selectedPerson.id}`, { method: "DELETE" });
+    setSelectedPersonId(null);
+    await reload();
+    setSaving(false);
+  }
+
+  async function handleReload() {
+    await reload();
+    if (workspace) {
+      api<TagData[]>(`/api/tags?workspaceId=${workspace.id}`).then(setAllTags);
+    }
+  }
+
+  /* -- Meeting mode -------------------------------------------------- */
+
+  if (viewMode === "meeting" && workspace) {
+    return (
+      <MeetingCaptureView
+        workspaceId={workspace.id}
+        teams={teams}
+        allPeople={allPeople}
+        onEnd={async () => {
+          setViewMode("canvas");
+          await reload();
+        }}
+      />
+    );
+  }
+
+  /* -- Pattern mode -------------------------------------------------- */
+
+  if (viewMode === "patterns" && workspace) {
+    return (
+      <PatternView
+        workspaceId={workspace.id}
+        onBack={() => setViewMode("canvas")}
+      />
+    );
+  }
+
+  /* -- CRM mode ------------------------------------------------------ */
+
+  if (viewMode === "crm" && workspace) {
+    return (
+      <CrmSettingsView
+        workspaceId={workspace.id}
+        onBack={() => setViewMode("canvas")}
+      />
+    );
+  }
+
+  /* -- History mode -------------------------------------------------- */
+
+  if (viewMode === "history" && workspace) {
+    return (
+      <MeetingHistoryView
+        workspaceId={workspace.id}
+        onBack={() => setViewMode("canvas")}
+      />
+    );
+  }
+
+  /* -- Loading ------------------------------------------------------- */
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[var(--color-green-950)] text-[var(--color-cream-50)]">
+        <p className="animate-pulse font-mono text-sm uppercase tracking-[0.3em] text-[var(--color-mint-300)]">
+          Laddar arbetsyta...
+        </p>
+      </div>
+    );
+  }
+
+  /* -- Canvas mode --------------------------------------------------- */
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(91,191,160,0.14),transparent_28%),linear-gradient(180deg,#102a24_0%,#0c211c_48%,#07110f_100%)] text-[var(--color-cream-50)]">
       <div className="mx-auto flex min-h-screen max-w-[1600px] flex-col px-4 py-4 md:px-6">
+        {/* Header */}
         <header className="flex flex-col gap-4 rounded-[2rem] border border-white/10 bg-white/6 px-5 py-5 backdrop-blur-sm lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="font-mono text-xs uppercase tracking-[0.3em] text-[var(--color-mint-300)]">
               Workspace
             </p>
             <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white">
-              North Star Team
+              {workspace?.name ?? "Arbetsyta"}
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-[var(--color-cream-100)]/72">
-              Första appskalet för Modul 1. Teamcontainrar, personkort och detaljpanel
-              är nu byggda som klickbar mockad UI.
+              Fånga utmaningar i möten, se mönster och agera på insikter.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <button className="rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm text-white transition hover:bg-white/10">
-              + Lägg till team
+            <button
+              className="rounded-full border border-[var(--color-mint-400)]/30 bg-[var(--color-mint-400)]/10 px-5 py-2.5 text-sm font-semibold text-[var(--color-mint-300)] transition hover:bg-[var(--color-mint-400)]/20"
+              onClick={() => setViewMode("meeting")}
+              type="button"
+            >
+              Starta möte
             </button>
-            <button className="rounded-full bg-[var(--color-mint-400)] px-4 py-2 text-sm font-semibold text-[var(--color-green-950)] transition hover:bg-[var(--color-mint-300)]">
-              Invite disabled i Modul 1
+            <button
+              className="rounded-full border border-[var(--color-copper-400)]/30 bg-[var(--color-copper-400)]/10 px-5 py-2.5 text-sm font-semibold text-[var(--color-copper-400)] transition hover:bg-[var(--color-copper-400)]/20"
+              onClick={() => setViewMode("patterns")}
+              type="button"
+            >
+              Mönster
             </button>
+            <button
+              className="rounded-full border border-[var(--color-sky-400)]/30 bg-[var(--color-sky-400)]/10 px-5 py-2.5 text-sm font-semibold text-[var(--color-sky-400)] transition hover:bg-[var(--color-sky-400)]/20"
+              onClick={() => setViewMode("crm")}
+              type="button"
+            >
+              CRM
+            </button>
+            <button
+              className="rounded-full border border-white/15 px-5 py-2.5 text-sm text-white/60 transition hover:bg-white/5 hover:text-white"
+              onClick={() => setShowImport(true)}
+              type="button"
+            >
+              Importera
+            </button>
+            <button
+              className="rounded-full border border-white/15 px-5 py-2.5 text-sm text-white/60 transition hover:bg-white/5 hover:text-white"
+              onClick={() => setViewMode("history")}
+              type="button"
+            >
+              Historik
+            </button>
+            <div className="flex min-w-[280px] items-center gap-2 rounded-full border border-white/12 bg-black/10 p-1">
+              <input
+                className="w-full bg-transparent px-4 py-2 text-sm text-white outline-none placeholder:text-white/40"
+                onChange={(e) => setNewTeamName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleCreateTeam()}
+                placeholder="Namn på nytt team"
+                value={newTeamName}
+              />
+              <button
+                className="rounded-full bg-[var(--color-mint-400)] px-4 py-2 text-sm font-semibold text-[var(--color-green-950)] transition hover:bg-[var(--color-mint-300)] disabled:opacity-50"
+                disabled={saving}
+                onClick={handleCreateTeam}
+                type="button"
+              >
+                + Lägg till team
+              </button>
+            </div>
+            {saving && (
+              <span className="rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/75">
+                Sparar...
+              </span>
+            )}
           </div>
         </header>
 
-        <div className="mt-4 grid flex-1 gap-4 xl:grid-cols-[1fr_400px]">
-          <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.03))]">
-            <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.06)_1px,transparent_1px)] [background-size:18px_18px] opacity-35" />
+        {/* Main grid */}
+        <div className="mt-4 grid flex-1 gap-4 xl:grid-cols-[1fr_420px]">
+          <CanvasView
+            teams={teams}
+            selectedPersonId={selectedPersonId}
+            onSelectPerson={setSelectedPersonId}
+            onTeamNameChange={handleTeamNameChange}
+            onDeleteTeam={handleDeleteTeam}
+            onCreatePerson={handleCreatePerson}
+            newPeopleByTeam={newPeopleByTeam}
+            onPersonDraftChange={handlePersonDraftChange}
+            saving={saving}
+          />
 
-            <div className="relative flex items-center justify-between border-b border-white/10 px-5 py-4">
-              <div>
-                <p className="font-mono text-xs uppercase tracking-[0.24em] text-[var(--color-mint-300)]">
-                  Canvas
-                </p>
-                <p className="mt-2 text-sm text-[var(--color-cream-100)]/68">
-                  Semistrukturerad yta med teamcontainrar och reserverad plats för drag
-                  and drop.
-                </p>
-              </div>
-
-              <div className="flex gap-2 text-xs text-[var(--color-cream-100)]/70">
-                <span className="rounded-full border border-white/10 px-3 py-1.5">75%</span>
-                <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1.5">
-                  100%
-                </span>
-                <span className="rounded-full border border-white/10 px-3 py-1.5">125%</span>
-              </div>
-            </div>
-
-            <div className="relative grid gap-5 p-5 xl:grid-cols-2">
-              {teams.map((team) => (
-                <article
-                  key={team.id}
-                  className="rounded-[1.75rem] border border-white/10 bg-[rgba(255,255,255,0.07)] p-4 shadow-[0_20px_60px_rgba(0,0,0,0.16)]"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <span className={`h-3 w-3 rounded-full ${team.accent}`} />
-                      <div>
-                        <h2 className="text-base font-semibold text-white">{team.name}</h2>
-                        <p className="text-sm text-[var(--color-cream-100)]/62">
-                          {team.people.length} personer
-                        </p>
-                      </div>
-                    </div>
-
-                    <button className="rounded-full border border-white/10 px-3 py-1.5 text-xs text-[var(--color-cream-100)]/72 transition hover:bg-white/8">
-                      + Person
-                    </button>
-                  </div>
-
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    {team.people.map((person) => {
-                      const isSelected = person.id === selectedPerson.id;
-
-                      return (
-                        <button
-                          key={person.id}
-                          className={`rounded-[1.35rem] p-4 text-left transition ${
-                            isSelected
-                              ? "bg-[var(--color-surface-card)] text-[var(--color-green-950)] shadow-[0_16px_40px_rgba(0,0,0,0.16)]"
-                              : "border border-white/10 bg-white/5 text-white hover:-translate-y-0.5 hover:bg-white/10"
-                          }`}
-                          onClick={() => setSelectedPersonId(person.id)}
-                          type="button"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--color-green-900)] text-sm font-semibold text-[var(--color-mint-300)]">
-                              {person.initials}
-                            </div>
-                            <span className="font-mono text-[11px] uppercase tracking-[0.18em] opacity-55">
-                              Card
-                            </span>
-                          </div>
-                          <p className="mt-4 text-base font-semibold">{person.name}</p>
-                          <p
-                            className={`mt-1 text-sm ${
-                              isSelected
-                                ? "text-[var(--color-stone-700)]"
-                                : "text-[var(--color-cream-100)]/68"
-                            }`}
-                          >
-                            {person.role}
-                          </p>
-                          <div
-                            className={`mt-4 h-1.5 rounded-full ${
-                              isSelected ? "bg-[var(--color-mint-400)]/70" : "bg-white/10"
-                            }`}
-                          />
-                        </button>
-                      );
-                    })}
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
-
-          <aside className="rounded-[2rem] border border-white/10 bg-[var(--color-cream-50)] text-[var(--color-green-950)] shadow-[0_30px_100px_rgba(0,0,0,0.26)]">
-            <div className="border-b border-black/8 px-6 py-5">
-              <p className="font-mono text-xs uppercase tracking-[0.28em] text-[var(--color-copper-500)]">
-                Detail panel
-              </p>
-              <div className="mt-4 flex items-start gap-4">
-                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--color-green-900)] text-sm font-semibold text-[var(--color-mint-300)]">
-                  {selectedPerson.initials}
-                </div>
-                <div>
-                  <h2 className="text-xl font-semibold">{selectedPerson.name}</h2>
-                  <p className="mt-1 text-sm text-[var(--color-stone-700)]">
-                    {selectedPerson.role}
-                  </p>
-                </div>
-              </div>
-              <p className="mt-4 text-sm leading-6 text-[var(--color-stone-700)]">
-                {selectedPerson.summary}
-              </p>
-            </div>
-
-            <div className="grid gap-5 px-6 py-5">
-              <section className="rounded-[1.5rem] border border-black/8 bg-white p-4">
-                <p className="font-mono text-xs uppercase tracking-[0.24em] text-[var(--color-copper-500)]">
-                  Grundinfo
-                </p>
-                <div className="mt-4 grid gap-3">
-                  <div className="rounded-2xl bg-[var(--color-cream-100)] p-3">
-                    <p className="text-xs uppercase tracking-[0.14em] text-[var(--color-stone-700)]">
-                      Roll
-                    </p>
-                    <p className="mt-2 text-sm font-medium">{selectedPerson.role}</p>
-                  </div>
-                  <div className="rounded-2xl bg-[var(--color-cream-100)] p-3">
-                    <p className="text-xs uppercase tracking-[0.14em] text-[var(--color-stone-700)]">
-                      Om personen
-                    </p>
-                    <p className="mt-2 text-sm leading-6">{selectedPerson.summary}</p>
-                  </div>
-                </div>
-              </section>
-
-              <section className="rounded-[1.5rem] border border-black/8 bg-white p-4">
-                <p className="font-mono text-xs uppercase tracking-[0.24em] text-[var(--color-copper-500)]">
-                  Anteckningar
-                </p>
-                <div className="mt-4 grid gap-3">
-                  {selectedPerson.notes.length > 0 ? (
-                    selectedPerson.notes.map((note) => (
-                      <article key={note.id} className="rounded-2xl bg-[var(--color-cream-100)] p-3">
-                        <p className="text-sm leading-6">{note.content}</p>
-                        <p className="mt-2 text-xs uppercase tracking-[0.18em] text-[var(--color-stone-700)]">
-                          {note.createdAt}
-                        </p>
-                      </article>
-                    ))
-                  ) : (
-                    <div className="rounded-2xl border border-dashed border-black/10 p-4 text-sm text-[var(--color-stone-700)]">
-                      Inga anteckningar ännu.
-                    </div>
-                  )}
-                </div>
-              </section>
-
-              <section className="rounded-[1.5rem] border border-black/8 bg-white p-4">
-                <p className="font-mono text-xs uppercase tracking-[0.24em] text-[var(--color-copper-500)]">
-                  Filer
-                </p>
-                <div className="mt-4 grid gap-3">
-                  {selectedPerson.files.length > 0 ? (
-                    selectedPerson.files.map((file) => (
-                      <article key={file.id} className="rounded-2xl bg-[var(--color-cream-100)] p-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-medium">{file.name}</p>
-                            <p className="mt-1 text-xs uppercase tracking-[0.16em] text-[var(--color-stone-700)]">
-                              {file.meta}
-                            </p>
-                          </div>
-                          <span className="rounded-full bg-white px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-[var(--color-copper-500)]">
-                            mock
-                          </span>
-                        </div>
-                        <p className="mt-3 text-sm leading-6 text-[var(--color-stone-700)]">
-                          {file.comment}
-                        </p>
-                      </article>
-                    ))
-                  ) : (
-                    <div className="rounded-2xl border border-dashed border-black/10 p-4 text-sm text-[var(--color-stone-700)]">
-                      Inga filer ännu.
-                    </div>
-                  )}
-                </div>
-              </section>
-            </div>
-          </aside>
+          {selectedPerson ? (
+            <PersonDetailPanel
+              person={selectedPerson}
+              team={selectedTeam}
+              teams={teams}
+              workspaceId={workspaceId}
+              saving={saving}
+              allTags={allTags}
+              onUpdatePerson={handleUpdatePerson}
+              onMovePerson={handleMoveSelectedPerson}
+              onDeletePerson={handleDeleteSelectedPerson}
+              onAddNote={handleAddNote}
+              onReload={handleReload}
+            />
+          ) : (
+            <PersonDetailPanel.Empty />
+          )}
         </div>
       </div>
+
+      {/* Historical Import Dialog */}
+      {showImport && (
+        <HistoricalImportDialog
+          workspaceId={workspaceId}
+          people={allPeople}
+          onClose={() => setShowImport(false)}
+          onImported={() => reload()}
+        />
+      )}
     </div>
   );
 }

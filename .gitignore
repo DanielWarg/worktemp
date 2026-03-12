@@ -40,3 +40,4 @@ prisma/dev.db-journal
 
 # generated
 *.tsbuildinfo
+generated/prisma/

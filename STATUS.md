@@ -2,9 +2,13 @@
 
 ## Nuläge
 
-- `PLAN.md` genomläst och används som källplan
+- `PLAN.md` omskriven till låst och skarpare Modul 1-spec
 - Projektets grundfiler skapade
-- Minimal Next.js 16-app är scaffoldad och deploybar
+- Next.js 16-app med fungerande MVP: workspace, team, person, anteckningar
+- Prisma 7 kopplad mot Neon PostgreSQL med alla Modul 1-tabeller
+- REST API-lager med full CRUD för workspace, team, person, notes
+- Frontend hämtar och skriver data via API (inte localStorage)
+- Demo-auth med fast account-id (riktig auth planeras i nästa steg)
 - GitHub-repo finns på `https://github.com/DanielWarg/worktemp`
 - CI/CD-grund är tillagd via GitHub Actions
 - Repo-säkerhet är förstärkt med secret-guardrails, PR-mall och workflow-dokumentation
@@ -20,6 +24,18 @@
 - Vercel används som deploy-mål när appen scaffoldats
 - Vercel används som deploy-mål för den nya Next.js-appen
 - GitHub Actions är primär CI/CD-motor
+- Modul 1 är en teamyta, inte en klassisk org chart
+- All rå input i anteckningar och filkommentarer ska behandlas som framtidsredo men oprocessad data
+- Repo:t ska köras på Node 24, inte Node 25
+
+## Låsta produktbeslut
+
+- teamcontainrar är huvudobjektet i canvasen
+- personkort lever inom teamcontainrar och bär bara lätt information på canvas
+- detalj och kontext hör hemma i sidopanelen
+- fri whiteboard-logik är uttryckligen exkluderad
+- analys, trendning och kategorisering byggs inte i Modul 1
+- filhantering ska hållas smal: upload + metadata + kommentar
 
 ## Implementerat i repo:t
 
@@ -27,12 +43,24 @@
   - App Router-grund med startsida, layout, workspace-shell och globala stilar
 - `app/api/health/route.ts`
   - enkel health endpoint för deployverifiering
+- `app/api/workspaces/` — workspace list och create, workspace detail med full team/person/note-graf
+- `app/api/teams/` — team create, update, delete
+- `app/api/persons/` — person create, update, delete, move mellan team, notes
+- `lib/auth.ts` — demo-auth helper (fast account-id)
 - `components/workspace/workspace-shell.tsx`
-  - första klickbara produkt-UI med mockdata för team och personer
+  - interaktiv workspace-vy med API-driven state (ej localStorage)
 - `package.json`
-  - Next.js 16, React 19, Tailwind 4, TypeScript och ESLint
+  - Next.js 16, React 19, Tailwind 4, TypeScript, Prisma och ESLint
+- `.nvmrc`, `.node-version`
+  - låser repo:t till Node 24.14.0
 - `eslint.config.mjs`, `next.config.ts`, `postcss.config.mjs`, `tsconfig.json`
   - bygg- och lintkonfiguration för webbappen
+- `prisma/schema.prisma`
+  - Modul 1-datamodell för account, workspace, team, person, membership, note, attachment och attachment comment
+- `prisma.config.ts`
+  - Prisma 7-konfiguration mot PostgreSQL
+- `lib/db/prisma.ts`
+  - server-side Prisma-klient via `@prisma/adapter-pg`
 - `.github/workflows/ci.yml`
   - kör `repo-hygiene` och `node-ci`
 - `.github/workflows/deploy-preview.yml`
@@ -65,12 +93,41 @@
 ## Verifierat lokalt
 
 - `pnpm install`
+- `npx -y node@24 ./node_modules/prisma/build/index.js validate`
+- `npx -y node@24 ./node_modules/prisma/build/index.js generate`
 - `pnpm lint`
 - `pnpm typecheck`
 - `pnpm build`
 - `pnpm start`
 - `GET /api/health` returnerar `200` och JSON
 - `GET /workspace` returnerar `200`
+
+## Prisma-status
+
+- Prisma 7.4.2 används
+- klienten genereras till `generated/prisma`
+- repo:t kräver Node 24 för Prisma-kommandon
+- ingen migration är körd ännu eftersom ingen faktisk databas är kopplad i detta steg
+
+## Frontendfunktioner som finns nu
+
+- skapa nya team direkt i workspace-vyn
+- byta namn på team inline
+- skapa nya personkort per team
+- välja personkort och öppna detaljpanelen
+- redigera namn, roll och beskrivning för vald person
+- lägga till anteckningar lokalt i detaljpanelen
+- flytta vald person mellan team från detaljpanelen
+- ta bort vald person
+- lokal persistens i webbläsaren så arbetsytan överlever refresh
+- tomma tillstånd för team utan personer och när ingen person är vald
+- UX-copy och exempeldata är nu mer inriktade på teamstruktur, ansvar och ledningsarbete än på generisk demo-data
+
+## Viktig status om frontendkoden
+
+- nuvarande `/workspace` ska behandlas som explorativ implementation, inte som slutligt låst produktbeteende
+- vidare implementation ska nu styras av den nya specifikationen i `PLAN.md`
+- om befintlig frontend avviker från spec ska spec vinna och UI:t justeras därefter
 
 ## GitHub-inställningar som redan är applicerade
 
@@ -107,33 +164,7 @@
 
 ## Rekommenderad startsekvens
 
-### Fas 1
-- Initiera Next.js 14+ med App Router och TypeScript
-- Installera Tailwind, Prisma, NextAuth, Zustand, `@dnd-kit`, Framer Motion
-- Sätt upp design tokens från planen
-- Sätt upp grundlayout med topbar och canvas-yta
-
-### Fas 2
-- Modellera Prisma-schema för:
-  - `Account`
-  - `Workspace`
-  - `Team`
-  - `Person`
-  - `TeamMembership`
-  - `Note`
-  - `Attachment`
-- Koppla mot PostgreSQL
-- Förbered storage-konfiguration för presigned uploads
-
-### Fas 3
-- Implementera auth och sessionflöde
-- Bygg workspace/team/person CRUD
-- Lägg till första tomma tillstånd
-
-### Fas 4
-- Bygg canvasinteraktioner
-- Bygg detaljpanelen
-- Lägg till anteckningar, uppladdningar och tester
+Se implementation order i `PLAN.md`. Den är nu den primära källan för byggordning.
 
 ## Öppna beslut som kan tas senare
 
@@ -145,11 +176,12 @@
 
 ## Nästa byggsteg
 
-- Sätta upp Prisma-schema och första migrering
-- Lägga till auth-flöde med NextAuth.js
-- Bygga layout shell med topbar och canvas-yta
-- Introducera första domänmodellerna för workspace, team och person
-- Ersätta mockdata i `/workspace` med riktiga serverhämtade modeller
+- Lägga till auth-flöde med NextAuth.js (ersätta demo-account)
+- Bygga filuppladdning (presigned URL till S3/R2)
+- Bygga filkommentarer
+- Lägga till drag-and-drop för personkort och teamcontainrar
+- Polera onboarding-flöde (tomma tillstånd, guidning)
+- Lägga till autosave-debounce på inline-redigering
 
 ## Definition av redo
 

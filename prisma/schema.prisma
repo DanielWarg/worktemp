@@ -1,0 +1,352 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Account {
+  id                String            @id @default(cuid())
+  email             String            @unique
+  name              String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  ownedWorkspaces   Workspace[]       @relation("WorkspaceOwner")
+  createdPeople     Person[]          @relation("PersonCreatedBy")
+  personLinks       Person[]          @relation("PersonAccountLink")
+  authoredNotes     Note[]
+  uploadedFiles     Attachment[]
+  attachmentComments AttachmentComment[]
+  facilitatedMeetings MeetingSession[]
+}
+
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  ownerId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner          Account          @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  teams          Team[]
+  people         Person[]
+  meetings       MeetingSession[]
+  challenges     Challenge[]
+  tags           Tag[]
+  imports        HistoricalImport[]
+  patterns       Pattern[]
+  crmConnections CrmConnection[]
+
+  @@index([ownerId])
+}
+
+model Team {
+  id         String           @id @default(cuid())
+  workspaceId String
+  name       String
+  color      String           @default("#5BBFA0")
+  canvasX    Float            @default(0)
+  canvasY    Float            @default(0)
+  sortOrder  Int              @default(0)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  memberships TeamMembership[]
+  meetings    MeetingSession[]
+
+  @@index([workspaceId, sortOrder])
+}
+
+model Person {
+  id           String           @id @default(cuid())
+  workspaceId  String
+  name         String
+  roleTitle    String?
+  summaryText  String?
+  createdById  String
+  accountId    String?
+  lastActiveAt DateTime?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  workspace    Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy    Account           @relation("PersonCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  account      Account?          @relation("PersonAccountLink", fields: [accountId], references: [id], onDelete: SetNull)
+  memberships  TeamMembership[]
+  notes        Note[]
+  attachments  Attachment[]
+  challenges           Challenge[]
+  meetingParticipations MeetingParticipant[]
+
+  @@index([workspaceId])
+  @@index([createdById])
+  @@index([accountId])
+}
+
+model TeamMembership {
+  id        String   @id @default(cuid())
+  teamId     String
+  personId   String
+  positionX Float    @default(0)
+  positionY Float    @default(0)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, personId])
+  @@index([teamId, sortOrder])
+  @@index([personId])
+}
+
+model Note {
+  id              String   @id @default(cuid())
+  personId        String
+  authorAccountId String
+  contentRaw      String
+  createdAt       DateTime @default(now())
+
+  person  Person  @relation(fields: [personId], references: [id], onDelete: Cascade)
+  author  Account @relation(fields: [authorAccountId], references: [id], onDelete: Restrict)
+
+  @@index([personId, createdAt])
+  @@index([authorAccountId])
+}
+
+model Attachment {
+  id          String              @id @default(cuid())
+  personId    String
+  fileName    String
+  fileUrl     String
+  fileSize    Int
+  mimeType    String
+  uploadedById String
+  createdAt   DateTime            @default(now())
+
+  person      Person              @relation(fields: [personId], references: [id], onDelete: Cascade)
+  uploadedBy  Account             @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
+  comments    AttachmentComment[]
+
+  @@index([personId, createdAt])
+  @@index([uploadedById])
+}
+
+model AttachmentComment {
+  id              String     @id @default(cuid())
+  attachmentId    String
+  authorAccountId String
+  contentRaw      String
+  createdAt       DateTime   @default(now())
+
+  attachment Attachment @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+  author     Account    @relation(fields: [authorAccountId], references: [id], onDelete: Restrict)
+
+  @@index([attachmentId, createdAt])
+  @@index([authorAccountId])
+}
+
+// ── Meeting & Challenge models (Fas 1) ──────────────────────────
+
+model MeetingSession {
+  id            String   @id @default(cuid())
+  workspaceId   String
+  teamId        String?
+  title         String?
+  status        String   @default("PLANNED") // PLANNED | ACTIVE | COMPLETED
+  scheduledFor  DateTime?
+  startedAt     DateTime?
+  endedAt       DateTime?
+  facilitatorId String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  workspace    Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  team         Team?                @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  facilitator  Account              @relation(fields: [facilitatorId], references: [id], onDelete: Restrict)
+  participants MeetingParticipant[]
+  challenges   Challenge[]
+
+  @@index([workspaceId, status])
+  @@index([facilitatorId])
+}
+
+model MeetingParticipant {
+  id        String   @id @default(cuid())
+  sessionId String
+  personId  String
+  joinedAt  DateTime @default(now())
+
+  session MeetingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  person  Person         @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, personId])
+  @@index([personId])
+}
+
+model Challenge {
+  id                 String   @id @default(cuid())
+  sessionId          String?
+  personId           String
+  workspaceId        String
+  contentRaw         String
+  contentNormalized  String?
+  sourceType         String   @default("MEETING") // MEETING | HISTORICAL | IMPORT | BETWEEN_MEETINGS
+  status             String   @default("OPEN")    // OPEN | ACKNOWLEDGED | RESOLVED
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  session           MeetingSession?  @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  person            Person           @relation(fields: [personId], references: [id], onDelete: Cascade)
+  workspace         Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  tags              ChallengeTag[]
+  patternChallenges PatternChallenge[]
+
+  @@index([workspaceId, status])
+  @@index([personId, createdAt])
+  @@index([sessionId])
+}
+
+// ── Fas 2: Tags, Patterns, Historical Import ────────────────────
+
+model Tag {
+  id          String         @id @default(cuid())
+  workspaceId String
+  name        String
+  color       String?
+  source      String         @default("MANUAL") // MANUAL | AI_SUGGESTED
+
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  challenges  ChallengeTag[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+}
+
+model ChallengeTag {
+  id          String    @id @default(cuid())
+  challengeId String
+  tagId       String
+
+  challenge   Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  tag         Tag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([challengeId, tagId])
+  @@index([tagId])
+}
+
+model HistoricalImport {
+  id           String   @id @default(cuid())
+  workspaceId  String
+  importedById String
+  sourceLabel  String
+  rawContent   String
+  parsedCount  Int      @default(0)
+  status       String   @default("PENDING") // PENDING | PROCESSING | COMPLETED | FAILED
+  createdAt    DateTime @default(now())
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+}
+
+model Pattern {
+  id              String   @id @default(cuid())
+  workspaceId     String
+  title           String
+  description     String?
+  patternType     String   @default("RECURRING") // RECURRING | ESCALATING | CROSS_PERSON | CROSS_TEAM
+  source          String   @default("MANUAL")    // MANUAL | AI_DETECTED
+  status          String   @default("EMERGING")  // EMERGING | CONFIRMED | ADDRESSED | DISMISSED
+  firstSeenAt     DateTime @default(now())
+  lastSeenAt      DateTime @default(now())
+  occurrenceCount Int      @default(1)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  workspace         Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  patternChallenges PatternChallenge[]
+  suggestions       Suggestion[]
+  crmEvidence       PatternCrmEvidence[]
+
+  @@index([workspaceId, status])
+}
+
+model PatternChallenge {
+  id          String    @id @default(cuid())
+  patternId   String
+  challengeId String
+
+  pattern   Pattern   @relation(fields: [patternId], references: [id], onDelete: Cascade)
+  challenge Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+
+  @@unique([patternId, challengeId])
+  @@index([challengeId])
+}
+
+// ── Fas 3: AI Suggestions ───────────────────────────────────────
+
+model Suggestion {
+  id        String   @id @default(cuid())
+  patternId String
+  content   String
+  source    String   @default("AI_GENERATED") // MANUAL | AI_GENERATED
+  status    String   @default("PENDING")      // PENDING | ACCEPTED | DISMISSED
+  createdAt DateTime @default(now())
+
+  pattern Pattern @relation(fields: [patternId], references: [id], onDelete: Cascade)
+
+  @@index([patternId])
+}
+
+// ── Fas 4: CRM Integration ─────────────────────────────────────
+
+model CrmConnection {
+  id              String    @id @default(cuid())
+  workspaceId     String
+  provider        String    // FRESHDESK | ZENDESK | HUBSPOT
+  displayName     String
+  apiKeyEncrypted String
+  baseUrl         String?
+  lastSyncAt      DateTime?
+  syncStatus      String    @default("IDLE") // IDLE | SYNCING | ERROR
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  workspace Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  snapshots CrmSnapshot[]
+
+  @@index([workspaceId])
+}
+
+model CrmSnapshot {
+  id                 String   @id @default(cuid())
+  connectionId       String
+  snapshotDate       DateTime
+  category           String
+  ticketCount        Int
+  avgResolutionHours Float?
+  metadata           String?  // JSON string
+  createdAt          DateTime @default(now())
+
+  connection CrmConnection      @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  evidence   PatternCrmEvidence[]
+
+  @@index([connectionId, snapshotDate])
+}
+
+model PatternCrmEvidence {
+  id         String @id @default(cuid())
+  patternId  String
+  snapshotId String
+  narrative  String
+
+  pattern  Pattern     @relation(fields: [patternId], references: [id], onDelete: Cascade)
+  snapshot CrmSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@unique([patternId, snapshotId])
+}

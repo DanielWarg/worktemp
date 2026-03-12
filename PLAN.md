@@ -1,559 +1,317 @@
-# Modul 1 — Teamstruktur & Visuell Arbetsyta
+# Produktplan: Team Problem Radar
 
-## A. Tolkning av Modul 1
+## Kontext
 
-Modul 1 är **grundplattan** för en SaaS-produkt riktad mot chefer och teamledare som vill skapa tydlig struktur i sina team. Kärnan är en visuell canvas där användaren bygger sin teamorganisation genom att skapa team, lägga till personer och organisera dem rumsligt. Varje person har ett klickbart kort som öppnar en detaljpanel med strukturerad information, fritext och filuppladdning.
+Appen är idag ett teamregister med canvas, personkort och anteckningar. Den faktiska visionen är en **problemradar** -- ett verktyg som används i teammöten för att fånga utmaningar, matcha dem mot hård data (CRM), och över tid avslöja mönster som teamet "bara hanterar" utan att adressera grundorsaken.
 
-**Produktens identitet:** Inte ett mätverktyg, inte HR-tech i traditionell mening. Det är ett *strukturverktyg* — ett sätt att se, organisera och dokumentera sitt team. Värdet i Modul 1 är överblick, tydlighet och ett levande dokument över teamet.
-
-**Min tolkning av scope:**
-- Login → Workspace-väljare (om flera team) → Canvas med team och personkort
-- Personkort → Detaljpanel (sidopanel, inte ny sida) med info, anteckningar, filer
-- Canvasen är fri visuellt men datamodellen är strikt hierarkisk
-- AI-hooks förbereds i datamodellen men exponeras inte
+Det som saknas är inte features -- det är en tydlig produktloop: **fånga -> strukturera -> se mönster -> agera**.
 
 ---
 
-## B. Kritik och Risker
+## Produktposition
 
-### Reella risker jag ser:
+**One-liner:** "Se vad ditt team hanterar men aldrig adresserar."
 
-**1. Canvas-komplexitet vs. värde**
-En fri canvas (à la Miro/FigJam) är tekniskt komplex. Frågan är: behöver användaren verkligen fri positionering, eller räcker det med en smart layoutad vy som *känns* fri? Min rekommendation: **semi-strukturerad canvas** — användaren kan dra och ordna kort inom definierade zoner (team-containrar), men inte helt fritt på en oändlig yta. Detta ger 80% av känslan med 20% av komplexiteten.
+**Köparen:** Ops-chef, teamledare eller Customer Success-ansvarig på medelstora bolag (50-500 anställda) som kör veckomöten och tänker "vi pratar om samma saker varje gång."
 
-**2. "Filuppladdning med kommentarer" är scope creep-risk**
-Filuppladdning låter enkelt men kräver: lagring (S3/liknande), filtypsvalidering, preview, versionshantering, GDPR-hantering av persondata i filer. **Rekommendation:** I Modul 1, bygg UI-ytan för filer men begränsa till enkel uppladdning + en kommentar per fil. Ingen preview, ingen versionshantering.
-
-**3. Otydlig avgränsning mellan "person" och "användare"**
-Är personerna på korten *användare av systemet* eller bara *poster som chefen skapar*? Detta påverkar datamodellen fundamentalt. **Antagande:** I Modul 1 är personkort *poster skapade av chefen*. De är inte inloggade användare. De har ingen koppling till auth. Detta förenklar enormt och är rätt för denna fas.
-
-**4. Multi-team: vad innebär det exakt?**
-Kan en person tillhöra flera team? Kan ett team ha sub-team? **Antagande:** En person kan tillhöra flera team (many-to-many). Inga sub-team i Modul 1 — det öppnar för trädstrukturer som komplicerar canvas-UX. Hierarkin är: Workspace → Team → Person.
-
-**5. Risk för "tom upplevelse"**
-Om Modul 1 bara är struktur utan analys, kan den kännas tunn. **Motgift:** Gör upplevelsen av att bygga teamet riktigt bra. Onboarding-flow, tydliga tomma tillstånd, snabb feedback, visuell tillfredsställelse. Produkten måste kännas värdefull *redan vid första sessionen*.
-
-**6. GDPR / persondata**
-Personkort med namn, roll, anteckningar och filer = personuppgiftsbehandling. Behöver tänkas in i datamodellen från dag 1 (radering, export, rättslig grund).
+**Kategorin:** Meeting-driven problem intelligence. Ingen befintlig produkt kopplar ihop mötesupplevelse med CRM-data.
 
 ---
 
-## C. Produktdefinition för Modul 1
+## Fas 1 -- Mötesredo capture (bygger på det som finns)
 
-### Produktnamn (arbetsnamn behövs)
-Antagande: Produkten har inget namn ännu. Jag refererar till den som **"produkten"**.
+**Mål:** Appen ska gå att använda i ett riktigt teammöte. En facilitator startar ett möte, klickar på en person, skriver vad de säger, trycker Enter. Klart.
 
-### Kärnlöfte
-> "Se ditt team. Förstå din struktur. Bygg grunden."
+### Datamodell -- nya tabeller
 
-### Målgrupp Modul 1
-- Chefer med 5–30 direkta/indirekta medarbetare
-- Teamledare som ansvarar för 1–3 team
-- Ingen IT-kompetens krävs
+```
+MeetingSession    -- id, workspaceId, teamId?, title?, status (PLANNED/ACTIVE/COMPLETED),
+                     scheduledFor?, startedAt?, endedAt?, facilitatorId, timestamps
+MeetingParticipant -- id, sessionId, personId, joinedAt  (unique: session+person)
+Challenge         -- id, sessionId?, personId, workspaceId, contentRaw,
+                     sourceType (MEETING/HISTORICAL/IMPORT/BETWEEN_MEETINGS),
+                     status (OPEN/ACKNOWLEDGED/RESOLVED), timestamps
+```
 
-### Kärnfunktioner Modul 1 (MoSCoW)
+### Ändringar i befintliga tabeller
+- `Person`: lägg till `lastActiveAt DateTime?` -- uppdateras vid ny Challenge/Note
 
-**Must have:**
-- Autentisering (login/registrering)
-- Workspace med canvas-vy
-- Skapa, namnge och ta bort team
-- Skapa, redigera och ta bort personkort inom team
-- Dra och organisera personkort inom team-containrar
-- Klickbar detaljpanel (sidopanel) per person: namn, roll, fritext/anteckningar
-- Stöd för flera team i samma workspace
-- Responsiv nog för laptop/desktop (inte mobil i Modul 1)
+### API-routes (nya)
+- `POST /api/meetings` -- skapa session
+- `GET /api/meetings/:id` -- hämta session med challenges
+- `PATCH /api/meetings/:id` -- starta/avsluta
+- `POST /api/meetings/:id/challenges` -- snabb capture (person + text + enter)
+- `GET /api/persons/:id/challenges` -- alla challenges per person
 
-**Should have:**
-- Filuppladdning på personkort (enkel, max 5 filer, med en kommentar per fil)
-- Flytta person mellan team (drag eller meny)
-- Tomma tillstånd med onboarding-guidning
-- Workspace-inställningar (namn, grundinfo)
+### UI-ändringar
 
-**Could have (förberedda ytor, ej funktionella):**
-- Taggar/etiketter på personkort (UI-yta finns, funktion begränsad)
-- Statusindikator på personkort (visuell plats reserverad)
-- Anteckningshistorik (senaste anteckningen visas, historik sparas men ingen UI för historik ännu)
+**Nytt: Meeting capture view**
+- Vänster: deltagarlista (personkort, vertikalt)
+- Center: stort capture-fält -- klicka person, skriv, Enter
+- Höger: löpande lista över fångade challenges denna session
+- Design: mörk bakgrund, stort typsnitt, minimalt UI -- optimerat för hastighet
 
-**Won't have (explicit exkluderat):**
-- AI-analys, kategorisering eller insikter
-- Dashboard med KPIer eller grafer
-- Pulsmätning eller enkäter
-- Användarinbjudningar (personer på kort ≠ användare)
-- Mobilapp eller mobilanpassning
-- Avancerad dokumenthantering
-- Integrationer med andra system
-- Delning eller samarbete i realtid
+**Befintligt: Workspace header**
+- Ny knapp: "Starta möte" som byter till capture-vyn
+
+**Befintligt: Sidopanel**
+- Ny flik: "Utmaningar" bredvid befintlig profil-info
+
+**Befintligt: Personkort på canvas**
+- Visa antal öppna challenges som subtil badge
+- Visa staleness: "3v sedan senaste input" via `lastActiveAt`
+
+### Komponentuppbrytning
+Nuvarande `workspace-shell.tsx` (650 rader) bryts ut till:
+- `CanvasView` -- teamcontainrar och personkort
+- `MeetingCaptureView` -- den snabba mötesytan
+- `PersonDetailPanel` -- sidopanelen
+- `TeamCard` / `PersonCard` -- enskilda kort
+- `ChallengeInput` -- capture-inputen (återanvänds i möte och sidopanel)
+
+### Vad fas 1 ger användaren
+Strukturerad möteslogg per person och session. Idag lever detta i anteckningsblock eller delade docs som ingen återbesöker. Även utan analys är "vad sa varje person i varje möte" värdefullt.
 
 ---
 
-## D. Användarflöde Steg för Steg
+## Fas 2 -- Struktur och minne (det som gör att man kommer tillbaka)
+
+**Mål:** Datan blir användbar mellan möten. Facilitatorn har anledning att öppna appen igen.
+
+### Datamodell -- nya tabeller
 
 ```
-1. LANDING / MARKETING PAGE
-   └── CTA: "Kom igång" → Registrering
-
-2. REGISTRERING
-   └── Email + lösenord (eller OAuth)
-   └── Steg 2: "Vad heter du?" + "Vilken roll har du?"
-   └── → Skapar automatiskt första workspace + placerar användaren som "ledare"
-
-3. FÖRSTA INLOGGNING — ONBOARDING
-   └── Tom canvas med välkomstmeddelande
-   └── Guide: "Skapa ditt första team"
-   └── Användaren namnger sitt team → Team-container dyker upp på canvas
-   └── Guide: "Lägg till din första teammedlem"
-   └── Användaren skapar ett personkort → Kort dyker upp i teamet
-   └── Guide: "Klicka på kortet för att lägga till mer info"
-   └── Detaljpanelen öppnas → Användaren ser fält för roll, anteckningar
-   └── Onboarding klar → Full canvas tillgänglig
-
-4. ÅTERKOMMANDE INLOGGNING
-   └── Login → Direkt till canvas (senaste workspace)
-   └── Om flera workspaces: workspace-väljare först
-
-5. DAGLIG ANVÄNDNING
-   └── Canvas: överblick, organisera, dra kort
-   └── Klick på kort: detaljpanel öppnas (slide-in från höger)
-   └── Detaljpanel: redigera info, lägg till anteckning, ladda upp fil
-   └── Stäng panel: tillbaka till canvas
-   └── Skapa nytt team: knapp på canvas
-   └── Flytta person: dra mellan team-containrar
+Tag               -- id, workspaceId, name, color?, source (MANUAL/AI_SUGGESTED)
+                     (unique: workspace+name)
+ChallengeTag      -- id, challengeId, tagId (unique: challenge+tag)
+HistoricalImport  -- id, workspaceId, importedById, sourceLabel, rawContent,
+                     parsedCount, status (PENDING/PROCESSING/COMPLETED/FAILED)
+Pattern           -- id, workspaceId, title, description?, patternType
+                     (RECURRING/ESCALATING/CROSS_PERSON/CROSS_TEAM),
+                     source (MANUAL/AI_DETECTED), status (EMERGING/CONFIRMED/ADDRESSED/DISMISSED),
+                     firstSeenAt, lastSeenAt, occurrenceCount, timestamps
+PatternChallenge  -- id, patternId, challengeId (unique: pattern+challenge)
 ```
+
+### Funktioner
+- **Taggning:** chip-baserad snabbtaggning på challenges (skapa tags inline)
+- **Historisk import:** klistra in gammal data (supportloggar, e-posttrådar) som bulk-text, systemet skapar challenges med `sourceType=HISTORICAL`
+- **Enkel mönsterdetektering (utan AI):** gruppera challenges per tag, räkna förekomster per session och person, flagga tags som dyker upp i 3+ möten eller från 3+ personer
+- **Mönstervy:** workspace-nivå, lista över identifierade mönster med koppling till underliggande challenges
+- **Manuell mönsterkoppling:** markera challenges och gruppera till ett mönster
+- **Staleness-signaler:** personkort tonas visuellt baserat på `lastActiveAt`
+
+### Vad fas 2 ger användaren
+Facilitatorn öppnar appen innan nästa möte och ser: "Förra mötet lyfte 4 personer fakturaproblem. Anna har nämnt det 3 gånger i rad." Det gör nästa möte progressivt istället för repetitivt.
 
 ---
 
-## E. Informationsarkitektur
+## Fas 3 -- AI-analys
 
-### Hierarki
+**Mål:** AI hittar mönster som människor missar.
+
+### Funktioner
+- **Normalisering:** AI rensar och standardiserar `contentRaw` -> `contentNormalized`
+- **Semantisk likhet:** embeddings-baserad clustering av challenges (samma problem, olika ord)
+- **Auto-taggning:** AI föreslår tags för otaggade challenges
+- **Mönsterdetektion:** AI föreslår nya mönster baserat på semantiska kluster
+- **Förslag:** AI genererar actionable suggestions per mönster
+
+### Datamodell -- nya tabeller
 ```
-Account (autentiserad användare)
-  └── Workspace (1:N — en användare kan ha flera workspaces)
-        ├── Metadata: namn, skapad datum
-        └── Team (1:N — en workspace har flera team)
-              ├── Metadata: namn, färg/ikon, skapad datum, position på canvas
-              └── TeamMembership (N:M — kopplingstabell)
-                    └── Person (personkort)
-                          ├── Grundinfo: namn, roll/funktion, avatar/initialer
-                          ├── Anteckningar (1:N — lista av anteckningar med tidsstämpel)
-                          ├── Filer (1:N — uppladdade filer med kommentar)
-                          ├── Taggar (framtida, M:N)
-                          ├── Canvas-position inom team (x, y offset)
-                          └── Metadata: skapad, uppdaterad, skapad_av
+Suggestion        -- id, patternId, content, source (MANUAL/AI_GENERATED),
+                     status (PENDING/ACCEPTED/DISMISSED)
 ```
 
-### Navigationsstruktur
-```
-Topbar (global)
-  ├── Logo/produktnamn
-  ├── Workspace-namn (klickbart → byt workspace)
-  ├── [framtida: notifikationer]
-  └── Profilmeny (inställningar, logga ut)
+### Arkitektur
+- AI körs som background jobs, inte i request path
+- Triggas efter möte avslutas eller manuellt
+- Resultat lagras i DB och visas vid nästa sidladdning
+- Anthropic Claude API eller OpenAI som backend
 
-Main area
-  └── Canvas (tar hela ytan under topbar)
-        ├── Team-containrar (visuella grupper)
-        │     └── Personkort (drag-bara inom och mellan team)
-        ├── "Lägg till team"-kontroll
-        └── Canvas-kontroller (zoom, centrera — minimalt)
-
-Sidopanel (slide-in, höger)
-  └── Persondetalj
-        ├── Header: namn, roll, avatar
-        ├── Sektion: Grundinfo (redigerbar)
-        ├── Sektion: Anteckningar (lista + lägg till ny)
-        ├── Sektion: Filer (lista + ladda upp)
-        └── Footer: metadata, ta bort person
-```
+### Vad fas 3 ger användaren
+"3 personer beskrev samma flaskhals från olika håll med olika ord. AI:n identifierade det som ett systemproblem." Det är aha-momentet.
 
 ---
 
-## F. Objekt och Relationer
+## Fas 4 -- CRM-integration
 
-### Datamodell (konceptuell)
+**Mål:** Koppla ihop subjektiv mötesupplevelse med objektiv ärendedata.
 
+### Datamodell -- nya tabeller
 ```
-Account
-  id: UUID
-  email: string
-  name: string
-  role_title: string (användarens egen roll)
-  created_at: timestamp
-
-Workspace
-  id: UUID
-  name: string
-  owner_id: FK → Account
-  created_at: timestamp
-  updated_at: timestamp
-
-Team
-  id: UUID
-  workspace_id: FK → Workspace
-  name: string
-  color: string (hex, för visuell identifikation)
-  canvas_x: float (teamets position på canvas)
-  canvas_y: float
-  canvas_width: float (kan expanderas)
-  canvas_height: float
-  sort_order: int
-  created_at: timestamp
-  updated_at: timestamp
-
-Person
-  id: UUID
-  workspace_id: FK → Workspace (person tillhör workspace, inte direkt team)
-  name: string
-  role_title: string (nullable)
-  avatar_url: string (nullable, framtida)
-  created_at: timestamp
-  updated_at: timestamp
-  created_by: FK → Account
-
-TeamMembership
-  id: UUID
-  team_id: FK → Team
-  person_id: FK → Person
-  position_x: float (inom teamet)
-  position_y: float
-  sort_order: int
-  joined_at: timestamp
-
-Note
-  id: UUID
-  person_id: FK → Person
-  content: text
-  created_at: timestamp
-  created_by: FK → Account
-
-Attachment
-  id: UUID
-  person_id: FK → Person
-  file_name: string
-  file_url: string
-  file_size: int
-  file_type: string (mime)
-  comment: text (nullable)
-  created_at: timestamp
-  created_by: FK → Account
+CrmConnection     -- id, workspaceId, provider (FRESHDESK/ZENDESK/HUBSPOT),
+                     displayName, apiKeyEncrypted, baseUrl?, lastSyncAt?,
+                     syncStatus (IDLE/SYNCING/ERROR), isActive
+CrmSnapshot       -- id, connectionId, snapshotDate, category, ticketCount,
+                     avgResolutionHours?, metadata (JSON)
+PatternCrmEvidence -- id, patternId, snapshotId, narrative
 ```
 
-### Framtida kopplingspunkter (byggs INTE, men designas för):
+### Funktioner
+- Settings-sida: välj CRM-provider, ange API-nyckel, test-sync
+- Daglig sync via Vercel Cron: hämta ärendetal per kategori
+- Mönster-vyn berikas: "Teamet nämnde fakturaproblem 12 gånger. Freshdesk visar 347 ärenden denna månad, upp 40% från Q3."
+- Trendjämförelse: denna månad vs förra
 
-| Framtida modul | Kopplingspunkt i Modul 1 |
-|---|---|
-| AI-analys | `Note.content` och `Attachment` blir input. Person-id som nyckel. |
-| Taggar/kategorier | `Tag`-tabell + `PersonTag`-koppling (M:N). UI-plats reserverad på kortet. |
-| Statusar/indikatorer | `PersonStatus`-fält (enum). Visuell plats på kortet. |
-| Tidslinje/historik | Alla entiteter har `created_at`. Notes har tidsstämplar. Event-log kan läggas till. |
-| Teammedlem som användare | `Person.account_id` (nullable FK) — kopplar personkort till inloggad användare i framtiden. |
-| Delning/samarbete | `WorkspaceMember`-tabell (roller, permissions). |
-| Sub-team/hierarki | `Team.parent_team_id` (nullable self-reference). |
+### Vad fas 4 ger användaren
+Teamet säger "vi får jättemånga samtal om fakturor." Systemet svarar med hård data. Gapet mellan upplevelse och verklighet blir synligt. DET är det som säljer.
 
 ---
 
-## G. UX-beskrivning
+## Fas 5 -- Polish och säljbarhet
 
-### Canvas
-
-**Typ:** Semi-strukturerad canvas (inte fri oändlig yta)
-- Canvasen har en definierad arbetsyta som scrollar vertikalt och horisontellt vid behov
-- Team visas som **containrar** (avrundade rektanglar med mjuk bakgrund) som auto-layoutas i ett grid men kan dras till nya positioner
-- Inom varje team-container layoutas personkort i ett responsivt grid (2–4 kolumner beroende på containerns bredd)
-- Personkort kan dras och släppas för att byta ordning inom teamet eller flyttas till annat team
-- **Zoom:** Enkel zoom (scroll + Ctrl/Cmd) med snap till 75%, 100%, 125%
-- **Bakgrund:** Subtil dot-grid (mörkgrön ton) som ger djupkänsla
-
-**Varför semi-strukturerad istället för fri:**
-- Fri canvas kräver kollisionshantering, oändlig yta, minimap — stor teknisk kostnad
-- Chefer vill ha *ordning*, inte kreativ frihet. Semi-struktur matchar use caset.
-- Enklare att rendera, bättre prestanda, lättare att göra responsiv
-
-### Team-container
-- Rektangulär yta med rundade hörn
-- Header: teamnamn (inline-redigerbar) + färgindikator + "..." meny
-- Kropp: grid av personkort
-- Footer: "+ Lägg till person"-knapp
-- Kan expanderas/kollapsa (chevron i header)
-- Subtil skuggning och bakgrundsfärg som skiljer från canvas
-
-### Personkort (card)
-- Storlek: ca 180×100px (kompakt men läsbart)
-- Innehåll: Initialer/avatar-cirkel + namn + roll (en rad, trunkerad)
-- Hover: subtil lift-effekt (box-shadow ökar)
-- Klick: öppnar detaljpanelen
-- Drag: visuell feedback (opacity, skugga, "lyfts" ur gridet)
-- Framtida: liten ikon-rad längst ner för taggar/status (tomt nu, plats reserverad)
-
-### Detaljpanel (sidopanel)
-- **Slide-in från höger**, 400–480px bred
-- **Overlay:** Canvasen dimmas subtilt bakom (inte helt blockerad)
-- **Header:** Stor avatar/initialer + namn (redigerbart) + roll (redigerbart) + stäng-knapp
-- **Sektioner (accordion-stil):**
-  1. **Grundinfo** — Roll, funktion, fritext "om personen"
-  2. **Anteckningar** — Kronologisk lista (senaste först) + "Ny anteckning"-textfält
-  3. **Filer** — Lista med filnamn, storlek, datum, kommentar + "Ladda upp"-knapp
-- **Footer:** "Skapad [datum]" + "Ta bort person" (röd, med bekräftelse)
-- **Beteende:** Escape eller klick utanför stänger. Ändringar sparas automatiskt (autosave med debounce).
-
-### Tomma tillstånd
-- **Tom canvas:** Illustration + "Skapa ditt första team" CTA. Varm, inbjudande.
-- **Tomt team:** "Lägg till teammedlemmar" med ikon. Inte bara en tom ruta.
-- **Tom detaljpanel-sektion:** Hjälptext i ljusgrått, t.ex. "Inga anteckningar ännu"
+- Riktig auth (NextAuth.js)
+- Workspace-roller (Owner, Facilitator, Viewer)
+- Onboarding-flöde
+- Export (PDF/markdown-sammanfattning för ledningspresentationer)
+- Möteshistorik-tidslinje
+- Tangentbordsgenvägar för power users
+- Drag-and-drop (personkort, teamcontainrar)
+- Filuppladdning
+- Prestanda (paginering, lazy loading)
 
 ---
 
-## H. Visuell Designriktning — Mörkgrönt Premium
+## Prissättning
 
-### Färgpalett
-
-```
-PRIMARY (Mörkgrön skala):
-  --green-950: #0A1F1A    ← Djupaste (bakgrunder, sidopanel header)
-  --green-900: #0F2E25    ← Canvas-bakgrund
-  --green-800: #1A4035    ← Team-container bakgrund
-  --green-700: #245A4A    ← Hover-states, aktiva element
-  --green-600: #2E7A64    ← Primary actions, knappar
-  --green-500: #3D9B7E    ← Accenter, ikoner
-  --green-400: #5BBFA0    ← Ljusare accenter, badges
-
-NEUTRAL (Varm grå, inte kall):
-  --neutral-950: #111110   ← Text primary (på ljus bakgrund)
-  --neutral-800: #2C2B28   ← Text secondary
-  --neutral-600: #5C5A54   ← Placeholder text
-  --neutral-400: #9C9A94   ← Disabled states
-  --neutral-200: #D4D2CC   ← Borders
-  --neutral-100: #EDECEA   ← Ljus bakgrund (detaljpanel kropp)
-  --neutral-50:  #F7F6F4   ← Ljusaste bakgrund
-
-SURFACE (Kort och containrar):
-  --surface-card: #FAFAF8       ← Personkort bakgrund
-  --surface-card-hover: #F2F1EE ← Personkort hover
-  --surface-panel: #F7F6F4      ← Sidopanel bakgrund
-  --surface-elevated: #FFFFFF   ← Modaler, dropdowns
-
-ACCENT:
-  --accent-warm: #C4956A    ← Varm guld/koppar för premium-accenter
-  --accent-error: #C4453A   ← Röd för destruktiva actions
-  --accent-success: #3D9B7E ← Grön (samma som green-500)
-
-CANVAS:
-  --canvas-bg: #0F2E25         ← Canvas bakgrund
-  --canvas-dot: rgba(255,255,255,0.06) ← Dot-grid
-  --canvas-team-bg: rgba(255,255,255,0.07) ← Team-container
-```
-
-### Typografi
-- **Font:** Inter (eller liknande geometric sans) för UI
-- **Headings:** Semi-bold, tight letter-spacing
-- **Body:** Regular, 14–15px, bra radavstånd
-- **Personnamn på kort:** Medium, 14px
-- **Roll på kort:** Regular, 12px, neutral-600
-
-### Designprinciper konkretiserat
-
-| Princip | Konkret implementation |
-|---|---|
-| Premium, inte flashigt | Djupa gröna toner, subtila gradienter, inga neonfärger |
-| Lugn, inte steril | Varma neutrala toner (beige-aktiga grå, inte blågrå) |
-| Kontrast | Ljusa kort mot mörk canvas — korten "lyser" |
-| Mänskligt | Runda avatarer, mjuka hörn (12–16px radius), generösa marginaler |
-| Struktur | Tydlig visuell hierarki, alignment, konsistenta avstånd (8px grid) |
-
-### Visuella signaturer
-- **Korten mot canvasen:** Ljusa kort mot mörk grön = primär visuell effekt. Det ska se ut som ljusa kort lagda på ett mörkgrönt bord.
-- **Guld/koppar-accent:** Används sparsamt för premium-känsla (t.ex. workspace-namn, dropdown-pilar, aktiv sektions-linje).
-- **Inga hårda kanter:** Allt har border-radius. Skuggor är mjuka och varma (inte blå-svarta).
-- **Animationer:** Subtila, 200–300ms, ease-out. Kort lyfts vid hover. Panel glider in. Inga studsar eller överdriven motion.
+Per workspace, inte per användare (facilitatorn är ofta en person):
+- **Free:** 1 workspace, 1 team, 5 personer, obegränsade möten. Ingen AI, ingen CRM.
+- **Team ($29/mån):** Obegränsat. Tags, mönster, historisk import.
+- **Pro ($79/mån):** AI-analys och mönsterdetektion.
+- **Enterprise ($199/mån):** CRM-integration, export, prioriterad support.
 
 ---
 
-## I. Komponentstruktur (Frontend)
+## Demo-ögonblick som säljer
 
-### Tech-stack (fastslaget)
-- **Framework:** Next.js 14+ (App Router) — deploy till Vercel
-- **State:** Zustand (lätt, enkel, bra för canvas-state)
-- **Drag & drop:** @dnd-kit (modernt, tillgängligt, flexibelt)
-- **Styling:** Tailwind CSS + CSS-variabler för temat
-- **Animationer:** Framer Motion (sidopanel, kort-animationer)
-- **Filuppladdning:** Presigned URLs till S3-kompatibel lagring
-- **Auth:** NextAuth.js
-- **Databas:** Neon (serverless PostgreSQL) via Prisma ORM
-- **Deploy:** Vercel (webbapp)
-
-### Komponentträd
-
-```
-App
-├── AuthProvider
-├── Layout
-│   ├── TopBar
-│   │   ├── Logo
-│   │   ├── WorkspaceSelector (dropdown)
-│   │   ├── [framtida: NotificationBell]
-│   │   └── ProfileMenu (dropdown)
-│   │
-│   └── MainContent
-│       ├── CanvasView
-│       │   ├── CanvasToolbar (zoom, centrera, "lägg till team")
-│       │   ├── CanvasArea (scrollbar, dot-grid bakgrund)
-│       │   │   ├── TeamContainer (en per team)
-│       │   │   │   ├── TeamHeader (namn, färg, meny, collapse)
-│       │   │   │   ├── PersonCardGrid
-│       │   │   │   │   └── PersonCard (draggable)
-│       │   │   │   │       ├── Avatar (initialer / bild)
-│       │   │   │   │       ├── PersonName
-│       │   │   │   │       ├── PersonRole
-│       │   │   │   │       └── [framtida: TagBar]
-│       │   │   │   └── AddPersonButton
-│       │   │   └── AddTeamButton (på canvas-nivå)
-│       │   └── CanvasOverlay (dim vid öppen panel)
-│       │
-│       └── DetailPanel (slide-in, conditional render)
-│           ├── PanelHeader (avatar, namn, roll, stäng)
-│           ├── SectionBasicInfo (redigerbar form)
-│           ├── SectionNotes
-│           │   ├── NoteList
-│           │   │   └── NoteItem (innehåll, datum)
-│           │   └── NoteInput (ny anteckning)
-│           ├── SectionFiles
-│           │   ├── FileList
-│           │   │   └── FileItem (namn, storlek, kommentar)
-│           │   └── FileUploadButton
-│           └── PanelFooter (metadata, ta bort)
-│
-├── OnboardingOverlay (visas första gången)
-│   ├── WelcomeStep
-│   ├── CreateTeamStep
-│   └── AddPersonStep
-│
-└── SharedComponents
-    ├── Button (primary, secondary, ghost, danger)
-    ├── Input (text, textarea)
-    ├── Dropdown
-    ├── Modal (bekräftelsedialoger)
-    ├── Avatar
-    ├── Badge
-    ├── Tooltip
-    └── EmptyState (illustration + CTA)
-```
+1. **90-sekunds capture:** Starta möte, fånga 5 challenges på under 90 sekunder. Snabbare än anteckningsblock -- och redan strukturerat.
+2. **Mönsteravslöjandet:** Visa workspace med 4 mötens data. "Tre personer nämnde samma problem utan att veta om varandra."
+3. **CRM-bryggan:** Mönster säger "billing complaints x12". CRM visar "347 ärenden, +40%". Upplevelse möter data.
+4. **Staleness-signalen:** Personkort tonar -- "Denna person lyfte 3 kritiska problem i oktober och har inte hörts av sedan dess."
 
 ---
 
-## J. Byggplan — Fasindelning
+## Varför det slår alternativen
 
-### Fas 1: Grundläggande infrastruktur
-- [ ] Projektsetup: Next.js, Tailwind, Prisma, Neon PostgreSQL
-- [ ] Databasschema (alla tabeller från sektion F)
-- [ ] Auth-flöde: registrering, login, session (NextAuth.js)
-- [ ] Global layout: TopBar + MainContent-area
-- [ ] Design tokens: färger, typografi, spacing som CSS-variabler
-- [ ] Grundläggande API-routes: CRUD för Workspace, Team, Person
-- [ ] Vercel deploy-pipeline
-
-### Fas 2: Canvas och team
-- [ ] CanvasArea-komponent med dot-grid bakgrund
-- [ ] TeamContainer-komponent (skapa, namnge, visa)
-- [ ] PersonCard-komponent (skapa, visa namn + roll)
-- [ ] Grid-layout av kort inom team
-- [ ] "Lägg till team" och "Lägg till person" flöden
-- [ ] Inline-redigering av teamnamn
-
-### Fas 3: Drag & drop + interaktion
-- [ ] @dnd-kit integration
-- [ ] Drag personkort inom team (omorganisera)
-- [ ] Drag personkort mellan team (flytta)
-- [ ] Drag team-containrar (omorganisera på canvas)
-- [ ] Visuell feedback vid drag (lift, skugga, drop-zoner)
-
-### Fas 4: Detaljpanel
-- [ ] Sidopanel slide-in animation (Framer Motion)
-- [ ] PersonHeader med redigerbar info
-- [ ] SectionBasicInfo med autosave
-- [ ] SectionNotes med lista + input
-- [ ] SectionFiles med uppladdning + kommentar (S3 presigned URLs)
-- [ ] Canvas-dim overlay vid öppen panel
-
-### Fas 5: Polering och onboarding
-- [ ] Onboarding-flow för nya användare
-- [ ] Tomma tillstånd (alla nivåer)
-- [ ] Bekräftelsedialoger (ta bort person, ta bort team)
-- [ ] Workspace-väljare i TopBar
-- [ ] Responsivitet laptop/desktop
-- [ ] Loading states, error states
-- [ ] Keyboard shortcuts (Escape stänger panel, etc.)
-
-### Fas 6: Test och stabilisering
-- [ ] E2E-tester (Playwright): login → skapa team → lägg till person → öppna detalj
-- [ ] API-tester
-- [ ] Prestanda: canvas med 5 team, 50 kort
-- [ ] Tillgänglighet: grundläggande a11y (fokus, kontrast, ARIA)
-- [ ] GDPR: radera person tar bort all relaterad data
+- **vs Spreadsheets:** Kopplar inte input till personer, möten eller mönster
+- **vs Notion:** Lagrar text men analyserar inte. Man kan klistra mötesanteckningar i Notion i åratal utan att se mönster
+- **vs Survey-verktyg:** Anonymt, abstrakt, periodiskt. Inte konkreta problem i kontext av faktiskt arbete
+- **vs CRM-dashboards:** Visar vad som hände i systemet, inte vad teamet säger om det
 
 ---
 
-## K. Gränsdragning
+## Kritiska filer att modifiera
 
-### Ingår i Modul 1
-| Funktion | Status |
-|---|---|
-| Auth (login/registrering) | Full implementation |
-| Workspace (skapa, namnge) | Full implementation |
-| Team (CRUD, canvas-position) | Full implementation |
-| Person (CRUD, position i team) | Full implementation |
-| Personkort (namn, roll, avatar-initialer) | Full implementation |
-| Detaljpanel (grundinfo, anteckningar) | Full implementation |
-| Filuppladdning (enkel, med kommentar) | Full implementation |
-| Drag & drop (kort inom/mellan team) | Full implementation |
-| Multi-team stöd | Full implementation |
-| Onboarding | Full implementation |
-| Tomma tillstånd | Full implementation |
+- `prisma/schema.prisma` -- alla nya modeller
+- `components/workspace/workspace-shell.tsx` -- bryts upp i mindre komponenter
+- `app/workspace/page.tsx` -- routing mellan canvas och mötesvy
+- `lib/auth.ts` -- ersätts med riktig auth (fas 5, men demo-auth räcker för fas 1-4)
+- `app/api/` -- nya routes för meetings, challenges, patterns, CRM
 
-### Explicit EXKLUDERAT från Modul 1
-| Funktion | Varför exkluderat |
-|---|---|
-| AI-analys/insikter | Modul 2+ |
-| Dashboard/KPIer | Modul 2+ |
-| Taggar/kategorier (fungerande) | UI-plats reserveras, funktion i Modul 2 |
-| Statusar på personkort | UI-plats reserveras |
-| Inbjudan av teammedlemmar som användare | Kräver behörighetssystem, Modul 2+ |
-| Realtidssamarbete | Kräver websockets, Modul 3+ |
-| Mobilanpassning | Modul 2+ |
-| Integrationer (Slack, Calendar, etc.) | Modul 3+ |
-| Avancerad filhantering (preview, versioner) | Modul 2+ |
-| Sök | Modul 2 (bra att ha men inte MVP) |
-| Exportera/importera data | Modul 2+ |
-| Sub-team/hierarkier | Framtida, datamodellen stödjer det |
+## Verifiering
+
+Per fas:
+- **Fas 1:** Starta möte -> fånga 5 challenges -> avsluta möte -> se challenges i sidopanel. Mät tid: ska ta <2 min.
+- **Fas 2:** Tagga challenges -> se automatisk mönsterdetektering -> verifiera staleness på kort.
+- **Fas 3:** Kör AI-jobb -> verifiera att mönster skapas korrekt -> kontrollera suggestions.
+- **Fas 4:** Koppla test-CRM -> verifiera sync -> se CRM-data i mönstervy.
 
 ---
 
-## L. Rekommendationer för att Undvika Feltänk
+## Tidigare Modul 1-spec (referens)
 
-### 1. Bygg inte en fri canvas — bygg en smart layout
-Fri canvas (Miro-stil) är en teknisk fälla. Semi-strukturerad layout med drag-stöd ger samma upplevda frihet med bråkdelen av komplexiteten. Team-containrar som auto-layoutas i ett grid men kan omordnas ger rätt känsla.
+Den ursprungliga specen för Modul 1 finns bevarad nedan som referens. Datamodellen, canvas-reglerna och designriktningen gäller fortfarande -- men produktvisionen ovan ersätter den gamla avgränsningen.
 
-### 2. Person ≠ Användare — håll isär koncepten
-Absolut kritiskt. Person-entiteten ska INTE kopplas till auth i Modul 1. Förbered med `account_id: nullable` på Person-tabellen, men använd det inte. Att blanda ihop dessa tidigt skapar en röra som är svår att reda ut.
+### Datamodell (redan implementerad)
 
-### 3. Autosave, inte spara-knappar
-Modern UX-förväntan. Alla ändringar i detaljpanelen sparas automatiskt med debounce (300ms). Visa en subtil "Sparad"-indikator. Ingen explicit spara-knapp.
+#### Account
+- `id`, `email`, `name`, `created_at`
 
-### 4. Undvik att bygga ett designsystem — bygg komponenter
-Bygg inte ett generellt designsystem i Modul 1. Bygg specifika komponenter som behövs. Extrahera gemensamma mönster *efter* att de upprepats 3+ gånger.
+#### Workspace
+- `id`, `name`, `owner_id -> Account`, `created_at`, `updated_at`
 
-### 5. Canvas-state i frontend, inte i URL
-Canvasens zoom-nivå, scroll-position etc. är ephemeral state — lagra i Zustand, inte i URL eller databas. Team- och personpositioner *ska* lagras i databasen.
+#### Team
+- `id`, `workspace_id -> Workspace`, `name`, `color`, `canvas_x`, `canvas_y`, `sort_order`, `created_at`, `updated_at`
 
-### 6. Filuppladdning: presigned URLs
-Ladda INTE upp filer genom din API-server. Generera presigned S3-URLs och låt klienten ladda upp direkt. Lagra bara metadata i databasen. Sparar bandbredd, snabbare, mer skalbart.
+#### Person
+- `id`, `workspace_id -> Workspace`, `name`, `role_title`, `summary_text`, `created_by -> Account`, `account_id -> Account nullable`, `created_at`, `updated_at`
 
-### 7. Testa med realistiska volymer tidigt
-En chef med 3 team à 8–12 personer = 24–36 kort. Canvas måste fungera bra med detta. Testa inte bara med 2 kort.
+#### TeamMembership
+- `id`, `team_id -> Team`, `person_id -> Person`, `position_x`, `position_y`, `sort_order`, `created_at`
 
-### 8. Onboarding är inte valfritt
-Ett tomt verktyg utan onboarding är ett dött verktyg. Onboarding-flödet ska vara lika prioriterat som kärnfunktionerna.
+#### Note
+- `id`, `person_id -> Person`, `author_account_id -> Account`, `content_raw`, `created_at`
 
-### 9. Design mörkgrönt rätt
-Mörkgrönt kan lätt bli murrigt eller se "militärt" ut. Nyckeln: **kontrast**. Ljusa, varma kort mot djupgrön canvas. Koppar/guld-accenter bryter det gröna. Undvik att allt blir grönt — neutrala ytor (sidopanel, modaler) ska vara varma ljusa toner.
+#### Attachment
+- `id`, `person_id -> Person`, `file_name`, `file_url`, `file_size`, `mime_type`, `uploaded_by -> Account`, `created_at`
 
-### 10. Planera för GDPR från dag 1
-Varje Person-entitet ska kunna raderas fullständigt (cascade delete på notes, filer, memberships). Implementera soft-delete med automatisk hard-delete efter 30 dagar, eller hard-delete direkt.
+#### AttachmentComment
+- `id`, `attachment_id -> Attachment`, `author_account_id -> Account`, `content_raw`, `created_at`
+
+### Canvas-regler
+
+#### Vad användaren får göra
+- skapa flera team
+- flytta teamcontainrar på canvas
+- skapa personer i team
+- flytta personkort inom team
+- flytta personkort mellan team
+- klicka på kort för att öppna sidopanel
+
+#### Vad användaren inte får göra
+- skapa fria linjer eller relationer
+- rita på canvas
+- skapa godtyckliga objekt
+- lägga objekt utanför teamlogik
+- bygga subnoder eller mindmap-strukturer
+- skapa oändlig fri layout utan regler
+
+#### Hur frihet vs struktur ska lösas
+- canvasen känns fri genom att teamcontainrar kan placeras visuellt
+- personkort lever inom teamcontainrar
+- teamcontainrar är de primära visuella byggblocken
+- personkort använder grid eller soft layout inom containern
+- användaren får omorganisera, men alltid inom definierad modell
+
+### Designriktning
+
+#### Mörkgrön premium
+- djup mörkgrön canvas
+- varma ljusa ytor i sidopanel och kort
+- koppar- eller guldaccent sparsamt
+- tydlig kontrast
+- lugn, inte aggressiv
+
+#### UX-principer
+- överblick först
+- detalj på begäran
+- få starka komponenter
+- tydlig hierarki
+- autosave
+- låg kognitiv belastning
+- canvasen ska kännas levande men kontrollerad
+
+#### Känsla
+- modern, varm, exklusiv, professionell, lugn, trygg
+- inte tech-demo
+
+#### Vad som ska undvikas
+- blå generisk SaaS-look
+- dashboards med kort överallt
+- KPI-liknande badges utan verklig betydelse
+- för mycket text på korten
+- för mycket motion
+- hård org chart-estetik
+- Miro-kopia
+- glassmorphism överallt
+- AI-first-signaler i UI
+
+### Hårda produktbeslut (gäller fortfarande)
+- `Person` och `Account` hålls separata -- inte förhandlingsbart
+- Anteckningar och filkommentarer är riktiga tabeller, inte blob-fält
+- Semi-fri canvas, inte fri whiteboard
+- Modul 1 ska vara meningsfull utan AI
+- Filhantering: upload + metadata + kommentar, inget mer
+- Detalj i panel, inte på kort
+- Canvaskortet ska vara lättskannat
