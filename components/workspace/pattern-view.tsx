@@ -148,26 +148,38 @@ export function PatternView({ workspaceId, onBack }: PatternViewProps) {
     setAiStepResult(null);
   }
 
-  async function handleSuggestionStatus(suggestionId: string, status: string) {
-    await api(`/api/suggestions/${suggestionId}`, {
+  function handleSuggestionStatus(suggestionId: string, status: string) {
+    // Optimistic update
+    setPatterns((prev) =>
+      prev.map((p) => ({
+        ...p,
+        suggestions: p.suggestions.map((s) =>
+          s.id === suggestionId ? { ...s, status } : s
+        ),
+      }))
+    );
+    api(`/api/suggestions/${suggestionId}`, {
       method: "PATCH",
       body: JSON.stringify({ status }),
     });
-    await loadPatterns();
   }
 
-  async function handleUpdateStatus(patternId: string, status: string) {
-    await api(`/api/patterns/${patternId}`, {
+  function handleUpdateStatus(patternId: string, status: string) {
+    // Optimistic update
+    setPatterns((prev) =>
+      prev.map((p) => (p.id === patternId ? { ...p, status } : p))
+    );
+    api(`/api/patterns/${patternId}`, {
       method: "PATCH",
       body: JSON.stringify({ status }),
     });
-    await loadPatterns();
   }
 
   async function handleDelete(patternId: string) {
-    await api(`/api/patterns/${patternId}`, { method: "DELETE" });
+    // Optimistic update
+    setPatterns((prev) => prev.filter((p) => p.id !== patternId));
     if (selectedPatternId === patternId) setSelectedPatternId(null);
-    await loadPatterns();
+    await api(`/api/patterns/${patternId}`, { method: "DELETE" });
   }
 
   // Group patterns by their primary import (most common importId among linked challenges)
@@ -740,51 +752,63 @@ export function PatternView({ workspaceId, onBack }: PatternViewProps) {
                     {!isCollapsed && (
                       <div className="flex flex-col gap-1.5 px-2 pb-2">
                         {group.patterns.map((pattern) => (
-                          <button
+                          <div
                             key={pattern.id}
-                            className={`w-full rounded-xl border px-3.5 py-2.5 text-left transition ${
+                            className={`group/card flex w-full items-center rounded-xl border text-left transition ${
                               pattern.id === selectedPatternId
                                 ? "border-[var(--color-mint-400)]/40 bg-white/10"
                                 : "border-white/6 bg-white/[0.04] hover:bg-white/8"
                             }`}
-                            onClick={() => setSelectedPatternId(pattern.id)}
-                            type="button"
                           >
-                            <div className="flex items-center justify-between gap-3">
-                              <h3 className="text-sm font-semibold text-white truncate">{pattern.title}</h3>
-                              <div className="flex shrink-0 items-center gap-1.5">
-                                <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em]">
-                                  {pattern.occurrenceCount}x
-                                </span>
-                                <span
-                                  className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ${
-                                    pattern.status === "EMERGING"
-                                      ? "bg-[var(--color-copper-500)]/20 text-[var(--color-copper-400)]"
-                                      : pattern.status === "CONFIRMED"
-                                      ? "bg-[var(--color-mint-400)]/20 text-[var(--color-mint-300)]"
-                                      : pattern.status === "ADDRESSED"
-                                      ? "bg-[var(--color-sky-400)]/20 text-[var(--color-sky-400)]"
-                                      : "bg-white/10 text-white/50"
-                                  }`}
-                                >
-                                  {STATUS_LABELS[pattern.status] ?? pattern.status}
-                                </span>
-                                {pattern.crmEvidence && pattern.crmEvidence.length > 0 && (
-                                  <span className="rounded-full bg-[var(--color-sky-400)]/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--color-sky-400)]">
-                                    CRM
+                            <button
+                              className="min-w-0 flex-1 px-3.5 py-2.5 text-left"
+                              onClick={() => setSelectedPatternId(pattern.id)}
+                              type="button"
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <h3 className="text-sm font-semibold text-white truncate">{pattern.title}</h3>
+                                <div className="flex shrink-0 items-center gap-1.5">
+                                  <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em]">
+                                    {pattern.occurrenceCount}x
                                   </span>
-                                )}
+                                  <span
+                                    className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ${
+                                      pattern.status === "EMERGING"
+                                        ? "bg-[var(--color-copper-500)]/20 text-[var(--color-copper-400)]"
+                                        : pattern.status === "CONFIRMED"
+                                        ? "bg-[var(--color-mint-400)]/20 text-[var(--color-mint-300)]"
+                                        : pattern.status === "ADDRESSED"
+                                        ? "bg-[var(--color-sky-400)]/20 text-[var(--color-sky-400)]"
+                                        : "bg-white/10 text-white/50"
+                                    }`}
+                                  >
+                                    {STATUS_LABELS[pattern.status] ?? pattern.status}
+                                  </span>
+                                  {pattern.crmEvidence && pattern.crmEvidence.length > 0 && (
+                                    <span className="rounded-full bg-[var(--color-sky-400)]/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--color-sky-400)]">
+                                      CRM
+                                    </span>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
-                              <span className="text-[10px] uppercase tracking-[0.14em] text-white/40">
-                                {TYPE_LABELS[pattern.patternType] ?? pattern.patternType}
-                              </span>
-                              <span className="text-[10px] uppercase tracking-[0.14em] text-white/40">
-                                {pattern.patternChallenges.length} utmaning{pattern.patternChallenges.length !== 1 ? "ar" : ""}
-                              </span>
-                            </div>
-                          </button>
+                              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+                                <span className="text-[10px] uppercase tracking-[0.14em] text-white/40">
+                                  {TYPE_LABELS[pattern.patternType] ?? pattern.patternType}
+                                </span>
+                                <span className="text-[10px] uppercase tracking-[0.14em] text-white/40">
+                                  {pattern.patternChallenges.length} utmaning{pattern.patternChallenges.length !== 1 ? "ar" : ""}
+                                </span>
+                              </div>
+                            </button>
+                            <button
+                              className="shrink-0 px-3 py-2.5 text-white/0 transition group-hover/card:text-white/30 hover:!text-red-400"
+                              onClick={() => handleDelete(pattern.id)}
+                              title="Ta bort mönster"
+                              type="button"
+                            >
+                              ✕
+                            </button>
+                          </div>
                         ))}
                       </div>
                     )}
