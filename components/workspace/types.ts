@@ -75,6 +75,7 @@ export type TeamData = {
 export type WorkspaceData = {
   id: string;
   name: string;
+  systemContext?: string | null;
   teams: TeamData[];
 };
 

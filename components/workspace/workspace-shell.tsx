@@ -209,6 +209,7 @@ export function WorkspaceShell({ workspaceId }: { workspaceId: string }) {
     return (
       <PatternView
         workspaceId={workspace.id}
+        initialSystemContext={workspace.systemContext ?? ""}
         onBack={() => setViewMode("canvas")}
       />
     );

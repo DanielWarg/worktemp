@@ -7,6 +7,7 @@ import { HistoricalImportDialog } from "./historical-import-dialog";
 
 type PatternViewProps = {
   workspaceId: string;
+  initialSystemContext?: string;
   onBack: () => void;
 };
 
@@ -27,7 +28,7 @@ const TYPE_LABELS: Record<string, string> = {
 type AiProvider = "anthropic" | "local";
 type ProviderStatus = { available: boolean; label: string };
 
-export function PatternView({ workspaceId, onBack }: PatternViewProps) {
+export function PatternView({ workspaceId, initialSystemContext, onBack }: PatternViewProps) {
   const [patterns, setPatterns] = useState<PatternData[]>([]);
   const [loading, setLoading] = useState(true);
   const [aiRunning, setAiRunning] = useState(false);
@@ -40,7 +41,7 @@ export function PatternView({ workspaceId, onBack }: PatternViewProps) {
   const [showCloudWarning, setShowCloudWarning] = useState(false);
   const [cloudConfirmInput, setCloudConfirmInput] = useState("");
   const [providers, setProviders] = useState<Record<string, ProviderStatus>>({});
-  const [systemContext, setSystemContext] = useState("");
+  const [systemContext, setSystemContext] = useState(initialSystemContext ?? "");
   const [showContext, setShowContext] = useState(false);
   const [savingContext, setSavingContext] = useState(false);
   const [aiWarnings, setAiWarnings] = useState<string[]>([]);
@@ -78,9 +79,6 @@ export function PatternView({ workspaceId, onBack }: PatternViewProps) {
         setProviders(data.providers);
         if (data.providers.local?.available) setAiProvider("local");
       }
-    });
-    api<{ systemContext?: string }>(`/api/workspaces/${workspaceId}`).then((data) => {
-      if (!cancelled && data.systemContext) setSystemContext(data.systemContext);
     });
     loadImports();
     return () => { cancelled = true; };

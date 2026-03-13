@@ -20,10 +20,7 @@ export async function GET(
               person: {
                 include: {
                   notes: { orderBy: { createdAt: "desc" } },
-                  attachments: {
-                    orderBy: { createdAt: "desc" },
-                    include: { comments: { orderBy: { createdAt: "desc" } } },
-                  },
+                  attachments: { orderBy: { createdAt: "desc" } },
                   challenges: {
                     orderBy: { createdAt: "desc" },
                     include: { tags: { include: { tag: true } } },
