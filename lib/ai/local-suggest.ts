@@ -56,7 +56,8 @@ Svara i JSON-format:
     let results: { patternIndex: number; suggestions: string[] }[];
     try {
       const match = text.match(/\[[\s\S]*\]/);
-      results = match ? JSON.parse(match[0]) : [];
+      const cleaned = match ? match[0].replace(/\/\/[^\n]*/g, "") : null;
+      results = cleaned ? JSON.parse(cleaned) : [];
     } catch (err) {
       console.error(`[local-suggest] Batch ${batches.indexOf(batch) + 1}/${batches.length} misslyckades:`, err);
       failedBatches++;

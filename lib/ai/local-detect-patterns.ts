@@ -54,24 +54,28 @@ export async function detectPatternsAILocal(workspaceId: string, systemContext =
       [
         {
           role: "user",
-          content: `${contextPrefix(systemContext)}Du analyserar utmaningar som fångats i teammöten. Identifiera mönster — problem som är återkommande, eskalerande, eller delas av flera personer.
+          content: `${contextPrefix(systemContext)}Du analyserar utmaningar som fångats i teammöten. Identifiera mönster — problem som är återkommande, eskalerande, eller delas av flera personer/team.
+
+REGLER:
+- Kräv minst 2 challenges per mönster
+- Varje challenge ska bara tillhöra ETT mönster (det mest relevanta)
+- Skapa INTE dubbletter av befintliga mönster
+- Var restriktiv — skapa bara mönster med tydlig tematisk koppling
+- Om inga mönster finns, returnera tom array []
 
 Befintliga mönster (skapa inte dubbletter): ${skipTitles.join(", ") || "(inga)"}
 
-Utmaningar (batch ${batches.indexOf(batch) + 1}/${batches.length}):
+Utmaningar:
 ${challengeTexts}
 
-Identifiera mönster och returnera JSON:
+Returnera JSON-array (inga kommentarer i JSON):
 [{
   "title": "Kort titel",
   "description": "Förklaring av mönstret",
-  "patternType": "RECURRING|ESCALATING|CROSS_PERSON|CROSS_TEAM",
-  "challengeIds": ["id1", "id2", "id3"],
-  "suggestion": "En konkret åtgärd teamet kan vidta"
-}]
-
-Returnera bara nya mönster. Kräv minst 2 challenges per mönster.
-Om inga nya mönster finns, returnera tom array [].`,
+  "patternType": "<välj exakt EN av: RECURRING, ESCALATING, CROSS_PERSON, CROSS_TEAM>",
+  "challengeIds": ["id1", "id2"],
+  "suggestion": "En konkret åtgärd"
+}]`,
         },
       ],
       3000
@@ -79,7 +83,8 @@ Om inga nya mönster finns, returnera tom array [].`,
 
     try {
       const match = text.match(/\[[\s\S]*\]/);
-      const detected: DetectedPattern[] = match ? JSON.parse(match[0]) : [];
+      const cleaned = match ? match[0].replace(/\/\/[^\n]*/g, "") : null;
+      const detected: DetectedPattern[] = cleaned ? JSON.parse(cleaned) : [];
       for (const d of detected) {
         d.challengeIds = d.challengeIds.filter((id) => validChallengeIds.has(id));
         if (d.challengeIds.length >= 2) {

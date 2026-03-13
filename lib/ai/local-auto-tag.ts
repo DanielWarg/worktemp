@@ -45,7 +45,8 @@ Svara i JSON-format:
     let suggestions: { id: string; tags: string[] }[];
     try {
       const match = text.match(/\[[\s\S]*\]/);
-      suggestions = match ? JSON.parse(match[0]) : [];
+      const cleaned = match ? match[0].replace(/\/\/[^\n]*/g, "") : null;
+      suggestions = cleaned ? JSON.parse(cleaned) : [];
     } catch (err) {
       console.error(`[local-auto-tag] Batch ${batches.indexOf(batch) + 1}/${batches.length} misslyckades:`, err);
       failedBatches++;

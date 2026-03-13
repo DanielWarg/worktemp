@@ -37,7 +37,8 @@ Svara i JSON-format som en array av strängar, en per utmaning, i samma ordning:
     let normalized: string[];
     try {
       const match = text.match(/\[[\s\S]*\]/);
-      normalized = match ? JSON.parse(match[0]) : [];
+      const cleaned = match ? match[0].replace(/\/\/[^\n]*/g, "") : null;
+      normalized = cleaned ? JSON.parse(cleaned) : [];
     } catch (err) {
       console.error(`[local-normalize] Batch ${batches.indexOf(batch) + 1}/${batches.length} misslyckades:`, err);
       failedBatches++;

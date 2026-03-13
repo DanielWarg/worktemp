@@ -531,6 +531,14 @@ export function PatternView({ workspaceId, initialSystemContext, onBack }: Patte
                     )}
                   </div>
                 ))}
+                <button
+                  className="mt-1 rounded-full border border-[var(--color-mint-400)]/20 bg-[var(--color-mint-400)]/5 px-4 py-2 text-[11px] font-semibold text-[var(--color-mint-300)] transition hover:bg-[var(--color-mint-400)]/10 disabled:opacity-50"
+                  onClick={handleAIAnalysis}
+                  disabled={aiRunning}
+                  type="button"
+                >
+                  {aiRunning ? "Analyserar..." : "Kör AI-analys på all data"}
+                </button>
               </div>
             )}
           </div>
