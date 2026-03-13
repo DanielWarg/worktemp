@@ -14,6 +14,7 @@ export async function normalizeChallengesLocal(workspaceId: string, systemContex
 
   const batches = chunk(challenges, BATCH_SIZE);
   let totalUpdated = 0;
+  let failedBatches = 0;
 
   for (const batch of batches) {
     const challengeTexts = batch.map((c, i) => `${i + 1}. "${c.contentRaw}"`).join("\n");
@@ -37,7 +38,9 @@ Svara i JSON-format som en array av strängar, en per utmaning, i samma ordning:
     try {
       const match = text.match(/\[[\s\S]*\]/);
       normalized = match ? JSON.parse(match[0]) : [];
-    } catch {
+    } catch (err) {
+      console.error(`[local-normalize] Batch ${batches.indexOf(batch) + 1}/${batches.length} misslyckades:`, err);
+      failedBatches++;
       continue;
     }
 
@@ -52,5 +55,5 @@ Svara i JSON-format som en array av strängar, en per utmaning, i samma ordning:
     }
   }
 
-  return { processed: totalUpdated, batches: batches.length };
+  return { processed: totalUpdated, batches: batches.length, failedBatches };
 }

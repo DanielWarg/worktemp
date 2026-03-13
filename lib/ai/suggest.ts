@@ -29,6 +29,7 @@ export async function generateSuggestions(workspaceId: string, systemContext = "
   const client = getAnthropicClient();
   const batches = chunk(patterns, BATCH_SIZE);
   let totalGenerated = 0;
+  let failedBatches = 0;
 
   for (const batch of batches) {
     const patternTexts = batch
@@ -64,7 +65,9 @@ Svara i JSON-format:
     try {
       const match = text.match(/\[[\s\S]*\]/);
       results = match ? JSON.parse(match[0]) : [];
-    } catch {
+    } catch (err) {
+      console.error(`[suggest] Batch ${batches.indexOf(batch) + 1}/${batches.length} misslyckades:`, err);
+      failedBatches++;
       continue;
     }
 
@@ -86,5 +89,5 @@ Svara i JSON-format:
     }
   }
 
-  return { generated: totalGenerated, batches: batches.length };
+  return { generated: totalGenerated, batches: batches.length, failedBatches };
 }

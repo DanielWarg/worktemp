@@ -33,35 +33,52 @@ export async function POST(request: Request) {
   const isLocal = provider === "local";
   const requestedSteps: string[] = steps ?? ["normalize", "tag", "patterns", "suggestions"];
   const results: Record<string, unknown> = { provider };
+  const warnings: string[] = [];
+
+  const STEP_LABELS: Record<string, string> = {
+    normalize: "Normalisering",
+    tag: "Auto-taggning",
+    patterns: "Mönsterdetektion",
+    suggestions: "Förslagsgenerering",
+  };
 
   try {
     if (requestedSteps.includes("normalize")) {
-      results.normalize = isLocal
+      const r = isLocal
         ? await normalizeChallengesLocal(workspaceId, ctx)
         : await normalizeChallenges(workspaceId, ctx);
+      results.normalize = r;
+      if (r.failedBatches) warnings.push(`${STEP_LABELS.normalize}: ${r.failedBatches} av ${r.batches} batchar misslyckades`);
     }
 
     if (requestedSteps.includes("tag")) {
-      results.tag = isLocal
+      const r = isLocal
         ? await autoTagChallengesLocal(workspaceId, ctx)
         : await autoTagChallenges(workspaceId, ctx);
+      results.tag = r;
+      if (r.failedBatches) warnings.push(`${STEP_LABELS.tag}: ${r.failedBatches} av ${r.batches} batchar misslyckades`);
     }
 
     if (requestedSteps.includes("patterns")) {
-      results.patterns = isLocal
+      const r = isLocal
         ? await detectPatternsAILocal(workspaceId, ctx)
         : await detectPatternsAI(workspaceId, ctx);
+      results.patterns = r;
+      if (r.failedBatches) warnings.push(`${STEP_LABELS.patterns}: ${r.failedBatches} av ${r.batches} batchar misslyckades`);
     }
 
     if (requestedSteps.includes("suggestions")) {
-      results.suggestions = isLocal
+      const r = isLocal
         ? await generateSuggestionsLocal(workspaceId, ctx)
         : await generateSuggestions(workspaceId, ctx);
+      results.suggestions = r;
+      if (r.failedBatches) warnings.push(`${STEP_LABELS.suggestions}: ${r.failedBatches} av ${r.batches} batchar misslyckades`);
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
-    return NextResponse.json({ error: message, results, provider }, { status: 502 });
+    console.error("[ai/analyze] Pipeline-fel:", err);
+    return NextResponse.json({ error: message, results, warnings, provider }, { status: 502 });
   }
 
-  return NextResponse.json(results);
+  return NextResponse.json({ ...results, warnings });
 }

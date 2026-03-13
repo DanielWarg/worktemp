@@ -14,6 +14,7 @@ export async function autoTagChallengesLocal(workspaceId: string, systemContext 
 
   const batches = chunk(challenges, BATCH_SIZE);
   let totalTagged = 0;
+  let failedBatches = 0;
 
   for (const batch of batches) {
     // Re-fetch existing tags each batch so new tags from previous batches are reused
@@ -45,7 +46,9 @@ Svara i JSON-format:
     try {
       const match = text.match(/\[[\s\S]*\]/);
       suggestions = match ? JSON.parse(match[0]) : [];
-    } catch {
+    } catch (err) {
+      console.error(`[local-auto-tag] Batch ${batches.indexOf(batch) + 1}/${batches.length} misslyckades:`, err);
+      failedBatches++;
       continue;
     }
 
@@ -70,5 +73,5 @@ Svara i JSON-format:
     }
   }
 
-  return { processed: totalTagged, batches: batches.length };
+  return { processed: totalTagged, batches: batches.length, failedBatches };
 }

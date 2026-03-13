@@ -43,6 +43,8 @@ export function PatternView({ workspaceId, onBack }: PatternViewProps) {
   const [systemContext, setSystemContext] = useState("");
   const [showContext, setShowContext] = useState(false);
   const [savingContext, setSavingContext] = useState(false);
+  const [aiWarnings, setAiWarnings] = useState<string[]>([]);
+  const [aiError, setAiError] = useState<string | null>(null);
 
   const loadPatterns = useCallback(async () => {
     const data = await api<PatternData[]>(`/api/patterns?workspaceId=${workspaceId}`);
@@ -91,23 +93,43 @@ export function PatternView({ workspaceId, onBack }: PatternViewProps) {
     setAiRunning(true);
     setAiStep(0);
     setAiStepResult(null);
+    setAiWarnings([]);
+    setAiError(null);
+    const collectedWarnings: string[] = [];
+
     for (let i = 0; i < AI_STEPS.length; i++) {
       setAiStep(i + 1);
       setAiStepResult(null);
-      const result = await api<Record<string, { processed?: number; detected?: number; generated?: number; batches?: number }>>(
-        "/api/ai/analyze",
-        {
-          method: "POST",
-          body: JSON.stringify({ workspaceId, steps: [AI_STEPS[i].key], provider: aiProvider }),
+      try {
+        const result = await api<Record<string, { processed?: number; detected?: number; generated?: number; batches?: number; failedBatches?: number }> & { warnings?: string[]; error?: string }>(
+          "/api/ai/analyze",
+          {
+            method: "POST",
+            body: JSON.stringify({ workspaceId, steps: [AI_STEPS[i].key], provider: aiProvider }),
+          }
+        );
+
+        if (result.error) {
+          setAiError(`${AI_STEPS[i].label}: ${result.error}`);
+          break;
         }
-      );
-      const stepData = result[AI_STEPS[i].key];
-      if (stepData) {
-        const count = stepData.processed ?? stepData.detected ?? stepData.generated ?? 0;
-        const batchInfo = stepData.batches && stepData.batches > 1 ? ` (${stepData.batches} batchar)` : "";
-        setAiStepResult(`${count} st${batchInfo}`);
+
+        if (result.warnings) collectedWarnings.push(...result.warnings);
+
+        const stepData = result[AI_STEPS[i].key];
+        if (stepData) {
+          const count = stepData.processed ?? stepData.detected ?? stepData.generated ?? 0;
+          const batchInfo = stepData.batches && stepData.batches > 1 ? ` (${stepData.batches} batchar)` : "";
+          const failInfo = stepData.failedBatches ? ` — ${stepData.failedBatches} misslyckade` : "";
+          setAiStepResult(`${count} st${batchInfo}${failInfo}`);
+        }
+      } catch {
+        setAiError(`${AI_STEPS[i].label}: Nätverksfel eller servern svarar inte`);
+        break;
       }
     }
+
+    if (collectedWarnings.length > 0) setAiWarnings(collectedWarnings);
     await loadPatterns();
     setAiRunning(false);
     setAiStep(0);
@@ -408,6 +430,57 @@ export function PatternView({ workspaceId, onBack }: PatternViewProps) {
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* AI error banner */}
+        {aiError && !aiRunning && (
+          <div className="mt-4 rounded-[2rem] border border-red-500/30 bg-red-500/10 p-5 backdrop-blur-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-mono text-xs font-semibold uppercase tracking-[0.24em] text-red-400">
+                  AI-analys avbröts
+                </p>
+                <p className="mt-2 text-sm text-red-300">{aiError}</p>
+              </div>
+              <button
+                className="shrink-0 rounded-full border border-red-500/25 px-3 py-1 text-[11px] text-red-400 transition hover:bg-red-500/10"
+                onClick={() => setAiError(null)}
+                type="button"
+              >
+                Stäng
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* AI warnings banner */}
+        {aiWarnings.length > 0 && !aiRunning && (
+          <div className="mt-4 rounded-[2rem] border border-[var(--color-copper-500)]/30 bg-[var(--color-copper-500)]/10 p-5 backdrop-blur-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-mono text-xs font-semibold uppercase tracking-[0.24em] text-[var(--color-copper-400)]">
+                  AI-analys klar med varningar
+                </p>
+                <ul className="mt-2 space-y-1">
+                  {aiWarnings.map((w, i) => (
+                    <li key={i} className="text-sm text-[var(--color-copper-400)]/80">
+                      {w}
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-[11px] text-white/40">
+                  Misslyckade batchar hoppades över. Resultaten kan vara ofullständiga.
+                </p>
+              </div>
+              <button
+                className="shrink-0 rounded-full border border-[var(--color-copper-500)]/25 px-3 py-1 text-[11px] text-[var(--color-copper-400)] transition hover:bg-[var(--color-copper-500)]/10"
+                onClick={() => setAiWarnings([])}
+                type="button"
+              >
+                Stäng
+              </button>
             </div>
           </div>
         )}

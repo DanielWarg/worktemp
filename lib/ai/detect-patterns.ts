@@ -38,6 +38,7 @@ export async function detectPatternsAI(workspaceId: string, systemContext = "") 
   const batches = chunk(challenges, BATCH_SIZE);
   const allDetected: DetectedPattern[] = [];
   const validChallengeIds = new Set(challenges.map((c) => c.id));
+  let failedBatches = 0;
 
   for (const batch of batches) {
     const challengeTexts = batch
@@ -91,8 +92,9 @@ Om inga nya mönster finns, returnera tom array [].`,
           allDetected.push(d);
         }
       }
-    } catch {
-      // skip unparseable batch
+    } catch (err) {
+      console.error(`[detect-patterns] Batch ${batches.indexOf(batch) + 1}/${batches.length} misslyckades:`, err);
+      failedBatches++;
     }
   }
 
@@ -130,5 +132,5 @@ Om inga nya mönster finns, returnera tom array [].`,
     created++;
   }
 
-  return { detected: created, batches: batches.length };
+  return { detected: created, batches: batches.length, failedBatches };
 }
