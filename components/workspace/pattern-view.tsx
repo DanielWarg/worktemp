@@ -47,6 +47,17 @@ export function PatternView({ workspaceId, onBack }: PatternViewProps) {
   const [aiError, setAiError] = useState<string | null>(null);
   const [groupBy, setGroupBy] = useState<"import" | "tag">("import");
   const [showImport, setShowImport] = useState(false);
+  const [imports, setImports] = useState<{ id: string; sourceLabel: string; parsedCount: number; createdAt: string }[]>([]);
+  const [showImports, setShowImports] = useState(false);
+  const [deletingImportId, setDeletingImportId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  const loadImports = useCallback(async () => {
+    const data = await api<{ id: string; sourceLabel: string; parsedCount: number; createdAt: string }[]>(
+      `/api/imports?workspaceId=${workspaceId}`
+    );
+    setImports(data);
+  }, [workspaceId]);
 
   const loadPatterns = useCallback(async () => {
     const data = await api<PatternData[]>(`/api/patterns?workspaceId=${workspaceId}`);
@@ -71,8 +82,17 @@ export function PatternView({ workspaceId, onBack }: PatternViewProps) {
     api<{ systemContext?: string }>(`/api/workspaces/${workspaceId}`).then((data) => {
       if (!cancelled && data.systemContext) setSystemContext(data.systemContext);
     });
+    loadImports();
     return () => { cancelled = true; };
-  }, [workspaceId]);
+  }, [workspaceId, loadImports]);
+
+  async function handleDeleteImport(importId: string) {
+    setDeletingImportId(importId);
+    await api(`/api/imports/${importId}`, { method: "DELETE" });
+    setConfirmDeleteId(null);
+    setDeletingImportId(null);
+    await Promise.all([loadPatterns(), loadImports()]);
+  }
 
   const AI_STEPS = [
     { key: "normalize", label: "Normaliserar utmaningar" },
@@ -446,6 +466,65 @@ export function PatternView({ workspaceId, onBack }: PatternViewProps) {
             </div>
           )}
         </div>
+
+        {/* Import management */}
+        {imports.length > 0 && (
+          <div className="mt-3">
+            <button
+              className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.2em] text-white/40 transition hover:text-white/70"
+              onClick={() => setShowImports(!showImports)}
+              type="button"
+            >
+              <span className={`inline-block transition-transform ${showImports ? "rotate-90" : ""}`}>▸</span>
+              Importer ({imports.length})
+            </button>
+            {showImports && (
+              <div className="mt-2 grid gap-1.5">
+                {imports.map((imp) => (
+                  <div
+                    key={imp.id}
+                    className="flex items-center gap-3 rounded-xl border border-white/8 bg-white/[0.03] px-4 py-2.5"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm text-white/80">{imp.sourceLabel}</p>
+                      <p className="text-[10px] text-white/35">
+                        {imp.parsedCount} ärenden · {formatDate(imp.createdAt)}
+                      </p>
+                    </div>
+                    {confirmDeleteId === imp.id ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] text-[var(--color-copper-400)]">Radera allt?</span>
+                        <button
+                          className="rounded-full bg-red-500/20 px-3 py-1 text-[11px] font-semibold text-red-400 transition hover:bg-red-500/30 disabled:opacity-50"
+                          onClick={() => handleDeleteImport(imp.id)}
+                          disabled={deletingImportId === imp.id}
+                          type="button"
+                        >
+                          {deletingImportId === imp.id ? "Raderar..." : "Ja, radera"}
+                        </button>
+                        <button
+                          className="rounded-full border border-white/15 px-3 py-1 text-[11px] text-white/50 transition hover:text-white/80"
+                          onClick={() => setConfirmDeleteId(null)}
+                          type="button"
+                        >
+                          Avbryt
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        className="shrink-0 rounded-full border border-white/10 px-3 py-1 text-[11px] text-white/40 transition hover:border-red-500/30 hover:text-red-400"
+                        onClick={() => setConfirmDeleteId(imp.id)}
+                        type="button"
+                      >
+                        Ta bort
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Progress overlay */}
         {aiRunning && (
@@ -890,6 +969,7 @@ export function PatternView({ workspaceId, onBack }: PatternViewProps) {
           onImported={() => {
             setShowImport(false);
             loadPatterns();
+            loadImports();
           }}
         />
       )}
