@@ -36,6 +36,7 @@ export type ChallengeData = {
   id: string;
   contentRaw: string;
   contentNormalized?: string | null;
+  customerName?: string | null;
   sourceType: string;
   status: string;
   createdAt: string;

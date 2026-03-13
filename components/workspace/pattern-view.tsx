@@ -819,9 +819,16 @@ export function PatternView({ workspaceId, onBack }: PatternViewProps) {
                   <div className="mt-3 grid gap-2">
                     {selectedPattern.patternChallenges.map((pc) => (
                       <div key={pc.challenge.id} className="rounded-2xl bg-[var(--color-cream-100)] p-3">
-                        <p className="text-xs font-semibold text-[var(--color-green-900)]">
-                          {pc.challenge.person.name}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs font-semibold text-[var(--color-green-900)]">
+                            {pc.challenge.person.name}
+                          </p>
+                          {pc.challenge.customerName && (
+                            <span className="rounded-full bg-[var(--color-sky-400)]/12 px-2 py-0.5 text-[9px] font-semibold text-[var(--color-sky-400)]">
+                              {pc.challenge.customerName}
+                            </span>
+                          )}
+                        </div>
                         <p className="mt-1 text-sm leading-6">{pc.challenge.contentRaw}</p>
                         <div className="mt-1 flex flex-wrap gap-1">
                           {pc.challenge.tags?.map((ct) => (

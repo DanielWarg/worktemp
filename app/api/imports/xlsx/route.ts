@@ -224,7 +224,6 @@ export async function POST(request: Request) {
   for (const row of filteredRows) {
     if (row.supportType) tagNames.add(row.supportType);
     if (row.priority) tagNames.add(row.priority);
-    if (row.account) tagNames.add(row.account);
     if (row.product) tagNames.add(row.product);
   }
   const tagCache = new Map<string, string>();
@@ -245,6 +244,7 @@ export async function POST(request: Request) {
       workspaceId,
       importId: importRecord.id,
       contentRaw: row.title + (row.description ? `\n${row.description.slice(0, 500)}` : ""),
+      customerName: row.account || null,
       sourceType: "HISTORICAL" as const,
       status: "OPEN" as const,
       createdAt: row.createdAt ? new Date(row.createdAt) : new Date(),
@@ -277,7 +277,6 @@ export async function POST(request: Request) {
     const tags: string[] = [];
     if (row.supportType) tags.push(row.supportType);
     if (row.priority) tags.push(row.priority);
-    if (row.account) tags.push(row.account);
     if (row.product) tags.push(row.product);
 
     for (const t of tags) {

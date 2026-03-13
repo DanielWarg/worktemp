@@ -196,6 +196,7 @@ model Challenge {
   importId           String?
   contentRaw         String
   contentNormalized  String?
+  customerName       String?
   sourceType         String   @default("MEETING") // MEETING | HISTORICAL | IMPORT | BETWEEN_MEETINGS
   status             String   @default("OPEN")    // OPEN | ACKNOWLEDGED | RESOLVED
   createdAt          DateTime @default(now())
