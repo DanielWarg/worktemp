@@ -29,7 +29,6 @@ type ProviderStatus = { available: boolean; label: string };
 export function PatternView({ workspaceId, onBack }: PatternViewProps) {
   const [patterns, setPatterns] = useState<PatternData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [detecting, setDetecting] = useState(false);
   const [aiRunning, setAiRunning] = useState(false);
   const [aiStep, setAiStep] = useState(0);
   const [aiTotalSteps] = useState(4);
@@ -45,6 +44,7 @@ export function PatternView({ workspaceId, onBack }: PatternViewProps) {
   const [savingContext, setSavingContext] = useState(false);
   const [aiWarnings, setAiWarnings] = useState<string[]>([]);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [groupBy, setGroupBy] = useState<"import" | "tag">("import");
 
   const loadPatterns = useCallback(async () => {
     const data = await api<PatternData[]>(`/api/patterns?workspaceId=${workspaceId}`);
@@ -71,16 +71,6 @@ export function PatternView({ workspaceId, onBack }: PatternViewProps) {
     });
     return () => { cancelled = true; };
   }, [workspaceId]);
-
-  async function handleDetect() {
-    setDetecting(true);
-    await api("/api/patterns/detect", {
-      method: "POST",
-      body: JSON.stringify({ workspaceId }),
-    });
-    await loadPatterns();
-    setDetecting(false);
-  }
 
   const AI_STEPS = [
     { key: "normalize", label: "Normaliserar utmaningar" },
@@ -226,6 +216,50 @@ export function PatternView({ workspaceId, onBack }: PatternViewProps) {
     });
   }, [patterns]);
 
+  // Group patterns by their primary tag (most common tag among linked challenges)
+  const tagGroupedPatterns = useMemo(() => {
+    type TagGroup = {
+      tagName: string | null;
+      patterns: PatternData[];
+    };
+
+    const groups = new Map<string, TagGroup>();
+
+    for (const pattern of patterns) {
+      const tagCounts = new Map<string, number>();
+
+      for (const pc of pattern.patternChallenges) {
+        for (const ct of pc.challenge.tags ?? []) {
+          tagCounts.set(ct.tag.name, (tagCounts.get(ct.tag.name) ?? 0) + 1);
+        }
+      }
+
+      let bestTag: string | null = null;
+      let bestCount = 0;
+      for (const [name, count] of tagCounts) {
+        if (count > bestCount) {
+          bestCount = count;
+          bestTag = name;
+        }
+      }
+
+      const key = bestTag ?? "__untagged__";
+      const group = groups.get(key);
+      if (group) {
+        group.patterns.push(pattern);
+      } else {
+        groups.set(key, { tagName: bestTag, patterns: [pattern] });
+      }
+    }
+
+    // Sort: tagged groups alphabetically, untagged last
+    return [...groups.values()].sort((a, b) => {
+      if (!a.tagName) return 1;
+      if (!b.tagName) return -1;
+      return a.tagName.localeCompare(b.tagName, "sv");
+    });
+  }, [patterns]);
+
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
   function toggleGroup(key: string) {
@@ -266,7 +300,7 @@ export function PatternView({ workspaceId, onBack }: PatternViewProps) {
               Mönster
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-[var(--color-cream-100)]/72">
-              Mönster som identifierats i teamets utmaningar. Gruppera via taggar eller kör automatisk detektion.
+              Mönster som identifierats i teamets utmaningar. Gruppera per import eller tagg.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -327,14 +361,27 @@ export function PatternView({ workspaceId, onBack }: PatternViewProps) {
                 )}
               </button>
             </div>
-            <button
-              className="rounded-full border border-white/15 px-5 py-2.5 text-sm text-white/60 transition hover:bg-white/5 hover:text-white disabled:opacity-50"
-              onClick={handleDetect}
-              disabled={detecting}
-              type="button"
-            >
-              {detecting ? "Analyserar..." : "Tagg-detektion"}
-            </button>
+            {/* Group-by toggle */}
+            <div className="flex items-center rounded-full border border-white/15 p-0.5">
+              <button
+                className={`rounded-full px-3 py-1.5 text-[11px] font-semibold tracking-wide transition ${
+                  groupBy === "import" ? "bg-white/15 text-white" : "text-white/40 hover:text-white/70"
+                }`}
+                onClick={() => setGroupBy("import")}
+                type="button"
+              >
+                Per import
+              </button>
+              <button
+                className={`rounded-full px-3 py-1.5 text-[11px] font-semibold tracking-wide transition ${
+                  groupBy === "tag" ? "bg-white/15 text-white" : "text-white/40 hover:text-white/70"
+                }`}
+                onClick={() => setGroupBy("tag")}
+                type="button"
+              >
+                Per tagg
+              </button>
+            </div>
             <button
               className="rounded-full bg-[var(--color-mint-400)] px-5 py-2.5 text-sm font-semibold text-[var(--color-green-950)] transition hover:bg-[var(--color-mint-300)] disabled:opacity-50"
               onClick={handleAIAnalysis}
@@ -392,15 +439,13 @@ export function PatternView({ workspaceId, onBack }: PatternViewProps) {
         </div>
 
         {/* Progress overlay */}
-        {(detecting || aiRunning) && (
+        {aiRunning && (
           <div className="mt-4 rounded-[2rem] border border-[var(--color-mint-400)]/20 bg-white/5 p-6 backdrop-blur-sm">
             <div className="flex items-center gap-4">
               <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--color-mint-400)] border-t-transparent" />
               <div className="flex-1">
                 <p className="font-mono text-xs uppercase tracking-[0.24em] text-[var(--color-mint-300)]">
-                  {detecting
-                    ? "Kör tagg-baserad detektion..."
-                    : `${aiProvider === "local" ? "Ministral (offline)" : "Claude"} — Steg ${aiStep} av ${aiTotalSteps}: ${AI_STEPS[aiStep - 1]?.label ?? "Förbereder..."}`}
+                  {`${aiProvider === "local" ? "Ministral (offline)" : "Claude"} — Steg ${aiStep} av ${aiTotalSteps}: ${AI_STEPS[aiStep - 1]?.label ?? "Förbereder..."}`}
                 </p>
                 {aiStepResult && (
                   <p className="mt-1 font-mono text-[10px] tracking-wide text-[var(--color-mint-400)]/70">
@@ -552,7 +597,7 @@ export function PatternView({ workspaceId, onBack }: PatternViewProps) {
 
         {/* Content */}
         <div className="mt-4 grid gap-4 xl:grid-cols-[1fr_480px]">
-          {/* Pattern list — grouped by import */}
+          {/* Pattern list — grouped by import or tag */}
           <div className="flex flex-col gap-3 self-start">
             {patterns.length === 0 ? (
               <div className="rounded-[2rem] border border-dashed border-white/14 bg-black/8 p-12 text-center">
@@ -560,19 +605,31 @@ export function PatternView({ workspaceId, onBack }: PatternViewProps) {
                   Inga mönster ännu
                 </p>
                 <p className="mt-3 max-w-sm mx-auto text-sm text-[var(--color-cream-100)]/66">
-                  Tagga utmaningar och kör detektion, eller skapa mönster manuellt.
+                  Importera utmaningar och kör AI-analys för att hitta mönster.
                 </p>
               </div>
             ) : (
-              groupedPatterns.map((group) => {
-                const groupKey = group.importId ?? "__no_import__";
-                const isCollapsed = collapsedGroups.has(groupKey);
+              (groupBy === "tag"
+                ? tagGroupedPatterns.map((g) => ({
+                    key: g.tagName ?? "__untagged__",
+                    label: g.tagName ?? "Otaggade",
+                    sublabel: `${g.patterns.length} mönster`,
+                    patterns: g.patterns,
+                  }))
+                : groupedPatterns.map((g) => ({
+                    key: g.importId ?? "__no_import__",
+                    label: g.label,
+                    sublabel: `${g.patterns.length} mönster${g.date ? ` · importerad ${formatDate(g.date)}` : ""}`,
+                    patterns: g.patterns,
+                  }))
+              ).map((group) => {
+                const isCollapsed = collapsedGroups.has(group.key);
                 return (
-                  <div key={groupKey} className="rounded-[1.5rem] border border-white/8 bg-white/[0.03]">
+                  <div key={group.key} className="rounded-[1.5rem] border border-white/8 bg-white/[0.03]">
                     {/* Group header */}
                     <button
                       className="flex w-full items-center gap-3 px-4 py-3 text-left"
-                      onClick={() => toggleGroup(groupKey)}
+                      onClick={() => toggleGroup(group.key)}
                       type="button"
                     >
                       <span className={`text-[10px] text-white/40 transition-transform ${isCollapsed ? "" : "rotate-90"}`}>
@@ -583,8 +640,7 @@ export function PatternView({ workspaceId, onBack }: PatternViewProps) {
                           {group.label}
                         </p>
                         <p className="mt-0.5 text-[10px] text-white/35">
-                          {group.patterns.length} mönster
-                          {group.date && ` · importerad ${formatDate(group.date)}`}
+                          {group.sublabel}
                         </p>
                       </div>
                       <span className="shrink-0 rounded-full bg-white/8 px-2 py-0.5 text-[10px] font-semibold text-white/50">
