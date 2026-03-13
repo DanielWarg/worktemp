@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PatternData } from "./types";
 import { api, formatDate } from "./helpers";
+import { HistoricalImportDialog } from "./historical-import-dialog";
 
 type PatternViewProps = {
   workspaceId: string;
@@ -45,6 +46,7 @@ export function PatternView({ workspaceId, onBack }: PatternViewProps) {
   const [aiWarnings, setAiWarnings] = useState<string[]>([]);
   const [aiError, setAiError] = useState<string | null>(null);
   const [groupBy, setGroupBy] = useState<"import" | "tag">("import");
+  const [showImport, setShowImport] = useState(false);
 
   const loadPatterns = useCallback(async () => {
     const data = await api<PatternData[]>(`/api/patterns?workspaceId=${workspaceId}`);
@@ -382,6 +384,13 @@ export function PatternView({ workspaceId, onBack }: PatternViewProps) {
                 Per tagg
               </button>
             </div>
+            <button
+              className="rounded-full border border-white/15 px-5 py-2.5 text-sm text-white/60 transition hover:bg-white/5 hover:text-white"
+              onClick={() => setShowImport(true)}
+              type="button"
+            >
+              Importera
+            </button>
             <button
               className="rounded-full bg-[var(--color-mint-400)] px-5 py-2.5 text-sm font-semibold text-[var(--color-green-950)] transition hover:bg-[var(--color-mint-300)] disabled:opacity-50"
               onClick={handleAIAnalysis}
@@ -873,6 +882,17 @@ export function PatternView({ workspaceId, onBack }: PatternViewProps) {
           )}
         </div>
       </div>
+
+      {showImport && (
+        <HistoricalImportDialog
+          workspaceId={workspaceId}
+          onClose={() => setShowImport(false)}
+          onImported={() => {
+            setShowImport(false);
+            loadPatterns();
+          }}
+        />
+      )}
     </div>
   );
 }

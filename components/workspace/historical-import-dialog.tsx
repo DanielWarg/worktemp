@@ -1,13 +1,10 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { PersonData } from "./types";
+import { useState, useRef, useEffect } from "react";
 import { api } from "./helpers";
 
 type HistoricalImportDialogProps = {
   workspaceId: string;
-  people: (PersonData & { teamId: string })[];
-  teams: { id: string; name: string }[];
   onClose: () => void;
   onImported: () => void;
 };
@@ -34,15 +31,18 @@ type ImportResult = {
   personCount: number;
 };
 
+type SimpleTeam = { id: string; name: string };
+type SimplePerson = { id: string; name: string };
+
 export function HistoricalImportDialog({
   workspaceId,
-  people,
-  teams,
   onClose,
   onImported,
 }: HistoricalImportDialogProps) {
   const [mode, setMode] = useState<"choose" | "text" | "file">("choose");
-  const [personId, setPersonId] = useState(people[0]?.id ?? "");
+  const [people, setPeople] = useState<SimplePerson[]>([]);
+  const [teams, setTeams] = useState<SimpleTeam[]>([]);
+  const [personId, setPersonId] = useState("");
   const [sourceLabel, setSourceLabel] = useState("");
   const [rawContent, setRawContent] = useState("");
   const [importing, setImporting] = useState(false);
@@ -55,10 +55,24 @@ export function HistoricalImportDialog({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<XlsxPreview | null>(null);
   const [previewing, setPreviewing] = useState(false);
-  const [teamId, setTeamId] = useState(teams[0]?.id ?? "");
+  const [teamId, setTeamId] = useState("");
   const [fileResult, setFileResult] = useState<ImportResult | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [excludedOwners, setExcludedOwners] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    api<{ teams: { id: string; name: string; memberships: { person: { id: string; name: string } }[] }[] }>(
+      `/api/workspaces/${workspaceId}`
+    ).then((ws) => {
+      const t = ws.teams ?? [];
+      setTeams(t.map((tm) => ({ id: tm.id, name: tm.name })));
+      if (t.length > 0 && !teamId) setTeamId(t[0].id);
+      const p = t.flatMap((tm) => tm.memberships.map((m) => m.person));
+      const unique = [...new Map(p.map((x) => [x.id, x])).values()];
+      setPeople(unique);
+      if (unique.length > 0 && !personId) setPersonId(unique[0].id);
+    });
+  }, [workspaceId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function saveContext() {
     if (dataContext.trim()) {

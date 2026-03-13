@@ -291,13 +291,6 @@ export function WorkspaceShell({ workspaceId }: { workspaceId: string }) {
             </button>
             <button
               className="rounded-full border border-white/15 px-5 py-2.5 text-sm text-white/60 transition hover:bg-white/5 hover:text-white"
-              onClick={() => setShowImport(true)}
-              type="button"
-            >
-              Importera
-            </button>
-            <button
-              className="rounded-full border border-white/15 px-5 py-2.5 text-sm text-white/60 transition hover:bg-white/5 hover:text-white"
               onClick={() => setViewMode("history")}
               type="button"
             >
@@ -366,8 +359,6 @@ export function WorkspaceShell({ workspaceId }: { workspaceId: string }) {
       {showImport && (
         <HistoricalImportDialog
           workspaceId={workspaceId}
-          people={allPeople}
-          teams={workspace?.teams.map((t) => ({ id: t.id, name: t.name })) ?? []}
           onClose={() => setShowImport(false)}
           onImported={() => reload()}
         />
