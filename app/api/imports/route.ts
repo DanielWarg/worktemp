@@ -2,6 +2,30 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getSessionAccountId } from "@/lib/auth";
 
+// GET /api/imports?workspaceId=xxx — list imports for workspace
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const workspaceId = searchParams.get("workspaceId");
+
+  if (!workspaceId) {
+    return NextResponse.json({ error: "workspaceId is required" }, { status: 400 });
+  }
+
+  const imports = await prisma.historicalImport.findMany({
+    where: { workspaceId },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      sourceLabel: true,
+      parsedCount: true,
+      status: true,
+      createdAt: true,
+    },
+  });
+
+  return NextResponse.json(imports);
+}
+
 // POST /api/imports — create historical import, parse into challenges
 export async function POST(request: Request) {
   const accountId = getSessionAccountId();
@@ -38,6 +62,7 @@ export async function POST(request: Request) {
       data: lines.map((line: string) => ({
         personId,
         workspaceId,
+        importId: importRecord.id,
         contentRaw: line,
         sourceType: "HISTORICAL",
         status: "OPEN",

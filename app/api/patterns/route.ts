@@ -21,6 +21,7 @@ export async function GET(request: Request) {
               person: { select: { id: true, name: true } },
               tags: { include: { tag: true } },
               session: { select: { id: true, title: true, startedAt: true } },
+              import: { select: { id: true, sourceLabel: true, createdAt: true } },
             },
           },
         },

@@ -1,19 +1,17 @@
-import { getAnthropicClient } from "./client";
+import { localChat } from "./local-client";
 import { prisma } from "@/lib/db/prisma";
 import { contextPrefix } from "./context";
 import { chunk } from "./chunk";
 
 const BATCH_SIZE = 25;
 
-// Auto-suggest tags for untagged challenges
-export async function autoTagChallenges(workspaceId: string, systemContext = "") {
+export async function autoTagChallengesLocal(workspaceId: string, systemContext = "") {
   const challenges = await prisma.challenge.findMany({
     where: { workspaceId, tags: { none: {} } },
   });
 
   if (challenges.length === 0) return { processed: 0 };
 
-  const client = getAnthropicClient();
   const batches = chunk(challenges, BATCH_SIZE);
   let totalTagged = 0;
 
@@ -26,13 +24,10 @@ export async function autoTagChallenges(workspaceId: string, systemContext = "")
       .map((c, i) => `${i + 1}. [id:${c.id}] "${c.contentNormalized || c.contentRaw}"`)
       .join("\n");
 
-    const response = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 2000,
-      messages: [
-        {
-          role: "user",
-          content: `${contextPrefix(systemContext)}Du är en kategoriseringsexpert. Tilldela 1-3 taggar till varje utmaning.
+    const text = await localChat([
+      {
+        role: "user",
+        content: `${contextPrefix(systemContext)}Du är en kategoriseringsexpert. Tilldela 1-3 taggar till varje utmaning.
 Återanvänd befintliga taggar när det passar. Skapa nya taggar bara vid behov.
 Taggar ska vara korta (1-3 ord) och beskrivande.
 
@@ -43,11 +38,8 @@ ${challengeTexts}
 
 Svara i JSON-format:
 [{"id": "challenge-id", "tags": ["tagg1", "tagg2"]}, ...]`,
-        },
-      ],
-    });
-
-    const text = response.content[0]?.type === "text" ? response.content[0].text : "";
+      },
+    ]);
 
     let suggestions: { id: string; tags: string[] }[];
     try {

@@ -367,6 +367,7 @@ export function WorkspaceShell({ workspaceId }: { workspaceId: string }) {
         <HistoricalImportDialog
           workspaceId={workspaceId}
           people={allPeople}
+          teams={workspace?.teams.map((t) => ({ id: t.id, name: t.name })) ?? []}
           onClose={() => setShowImport(false)}
           onImported={() => reload()}
         />

@@ -69,7 +69,7 @@ export function PersonDetailPanel({
   }
 
   return (
-    <aside className="rounded-[2rem] border border-white/10 bg-[var(--color-cream-50)] text-[var(--color-green-950)] shadow-[0_30px_100px_rgba(0,0,0,0.26)]">
+    <aside className="flex max-h-[calc(100vh-2rem)] flex-col rounded-[2rem] border border-white/10 bg-[var(--color-cream-50)] text-[var(--color-green-950)] shadow-[0_30px_100px_rgba(0,0,0,0.26)]">
       {/* Header */}
       <div className="border-b border-black/8 px-6 py-5">
         <p className="font-mono text-xs uppercase tracking-[0.28em] text-[var(--color-copper-500)]">
@@ -157,7 +157,7 @@ export function PersonDetailPanel({
         </button>
       </div>
 
-      <div className="grid gap-5 px-6 py-5">
+      <div className="grid min-h-0 flex-1 gap-5 overflow-y-auto overflow-x-hidden px-6 py-5">
         {activeTab === "profil" && (
           <>
             {/* Basic info */}

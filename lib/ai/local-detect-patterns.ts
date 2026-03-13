@@ -1,4 +1,4 @@
-import { getAnthropicClient } from "./client";
+import { localChat } from "./local-client";
 import { prisma } from "@/lib/db/prisma";
 import { contextPrefix } from "./context";
 import { chunk } from "./chunk";
@@ -13,8 +13,7 @@ type DetectedPattern = {
   suggestion: string;
 };
 
-// AI-powered pattern detection using semantic analysis
-export async function detectPatternsAI(workspaceId: string, systemContext = "") {
+export async function detectPatternsAILocal(workspaceId: string, systemContext = "") {
   const challenges = await prisma.challenge.findMany({
     where: { workspaceId },
     include: {
@@ -26,8 +25,6 @@ export async function detectPatternsAI(workspaceId: string, systemContext = "") 
   });
 
   if (challenges.length < 3) return { detected: 0 };
-
-  const client = getAnthropicClient();
 
   const existingPatterns = await prisma.pattern.findMany({
     where: { workspaceId },
@@ -52,10 +49,8 @@ export async function detectPatternsAI(workspaceId: string, systemContext = "") 
     const foundSoFar = allDetected.map((d) => d.title);
     const skipTitles = [...existingTitles, ...foundSoFar];
 
-    const response = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 3000,
-      messages: [
+    const text = await localChat(
+      [
         {
           role: "user",
           content: `${contextPrefix(systemContext)}Du analyserar utmaningar som fångats i teammöten. Identifiera mönster — problem som är återkommande, eskalerande, eller delas av flera personer.
@@ -78,9 +73,8 @@ Returnera bara nya mönster. Kräv minst 2 challenges per mönster.
 Om inga nya mönster finns, returnera tom array [].`,
         },
       ],
-    });
-
-    const text = response.content[0]?.type === "text" ? response.content[0].text : "";
+      3000
+    );
 
     try {
       const match = text.match(/\[[\s\S]*\]/);

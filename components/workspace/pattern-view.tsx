@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { PatternData } from "./types";
 import { api, formatDate } from "./helpers";
 
@@ -23,12 +23,23 @@ const TYPE_LABELS: Record<string, string> = {
   CROSS_TEAM: "Tvärs team",
 };
 
+type AiProvider = "anthropic" | "local";
+type ProviderStatus = { available: boolean; label: string };
+
 export function PatternView({ workspaceId, onBack }: PatternViewProps) {
   const [patterns, setPatterns] = useState<PatternData[]>([]);
   const [loading, setLoading] = useState(true);
   const [detecting, setDetecting] = useState(false);
   const [aiRunning, setAiRunning] = useState(false);
+  const [aiStep, setAiStep] = useState(0);
+  const [aiTotalSteps] = useState(4);
+  const [aiStepResult, setAiStepResult] = useState<string | null>(null);
   const [selectedPatternId, setSelectedPatternId] = useState<string | null>(null);
+  const [aiProvider, setAiProvider] = useState<AiProvider>("anthropic");
+  const [providers, setProviders] = useState<Record<string, ProviderStatus>>({});
+  const [systemContext, setSystemContext] = useState("");
+  const [showContext, setShowContext] = useState(false);
+  const [savingContext, setSavingContext] = useState(false);
 
   const loadPatterns = useCallback(async () => {
     const data = await api<PatternData[]>(`/api/patterns?workspaceId=${workspaceId}`);
@@ -44,6 +55,15 @@ export function PatternView({ workspaceId, onBack }: PatternViewProps) {
         setLoading(false);
       }
     });
+    api<{ providers: Record<string, ProviderStatus> }>("/api/ai/status").then((data) => {
+      if (!cancelled) {
+        setProviders(data.providers);
+        if (data.providers.local?.available) setAiProvider("local");
+      }
+    });
+    api<{ systemContext?: string }>(`/api/workspaces/${workspaceId}`).then((data) => {
+      if (!cancelled && data.systemContext) setSystemContext(data.systemContext);
+    });
     return () => { cancelled = true; };
   }, [workspaceId]);
 
@@ -57,14 +77,38 @@ export function PatternView({ workspaceId, onBack }: PatternViewProps) {
     setDetecting(false);
   }
 
+  const AI_STEPS = [
+    { key: "normalize", label: "Normaliserar utmaningar" },
+    { key: "tag", label: "Auto-taggar" },
+    { key: "patterns", label: "Söker mönster" },
+    { key: "suggestions", label: "Genererar förslag" },
+  ];
+
   async function handleAIAnalysis() {
     setAiRunning(true);
-    await api("/api/ai/analyze", {
-      method: "POST",
-      body: JSON.stringify({ workspaceId }),
-    });
+    setAiStep(0);
+    setAiStepResult(null);
+    for (let i = 0; i < AI_STEPS.length; i++) {
+      setAiStep(i + 1);
+      setAiStepResult(null);
+      const result = await api<Record<string, { processed?: number; detected?: number; generated?: number; batches?: number }>>(
+        "/api/ai/analyze",
+        {
+          method: "POST",
+          body: JSON.stringify({ workspaceId, steps: [AI_STEPS[i].key], provider: aiProvider }),
+        }
+      );
+      const stepData = result[AI_STEPS[i].key];
+      if (stepData) {
+        const count = stepData.processed ?? stepData.detected ?? stepData.generated ?? 0;
+        const batchInfo = stepData.batches && stepData.batches > 1 ? ` (${stepData.batches} batchar)` : "";
+        setAiStepResult(`${count} st${batchInfo}`);
+      }
+    }
     await loadPatterns();
     setAiRunning(false);
+    setAiStep(0);
+    setAiStepResult(null);
   }
 
   async function handleSuggestionStatus(suggestionId: string, status: string) {
@@ -87,6 +131,85 @@ export function PatternView({ workspaceId, onBack }: PatternViewProps) {
     await api(`/api/patterns/${patternId}`, { method: "DELETE" });
     if (selectedPatternId === patternId) setSelectedPatternId(null);
     await loadPatterns();
+  }
+
+  // Group patterns by their primary import (most common importId among linked challenges)
+  const groupedPatterns = useMemo(() => {
+    type ImportGroup = {
+      importId: string | null;
+      label: string;
+      date: string | null;
+      patterns: PatternData[];
+    };
+
+    const groups = new Map<string, ImportGroup>();
+
+    for (const pattern of patterns) {
+      // Count importIds across this pattern's challenges
+      const importCounts = new Map<string, { count: number; label: string; date: string }>();
+      let noImportCount = 0;
+
+      for (const pc of pattern.patternChallenges) {
+        const imp = pc.challenge.import;
+        if (imp) {
+          const existing = importCounts.get(imp.id);
+          if (existing) {
+            existing.count++;
+          } else {
+            importCounts.set(imp.id, { count: 1, label: imp.sourceLabel, date: imp.createdAt });
+          }
+        } else {
+          noImportCount++;
+        }
+      }
+
+      // Pick the most common import
+      let bestImportId: string | null = null;
+      let bestLabel = "Möten & manuellt";
+      let bestDate: string | null = null;
+      let bestCount = noImportCount;
+
+      for (const [id, info] of importCounts) {
+        if (info.count > bestCount) {
+          bestCount = info.count;
+          bestImportId = id;
+          bestLabel = info.label;
+          bestDate = info.date;
+        }
+      }
+
+      const key = bestImportId ?? "__no_import__";
+      const group = groups.get(key);
+      if (group) {
+        group.patterns.push(pattern);
+      } else {
+        groups.set(key, {
+          importId: bestImportId,
+          label: bestLabel,
+          date: bestDate,
+          patterns: [pattern],
+        });
+      }
+    }
+
+    // Sort: imports with dates newest first, "no import" last
+    return [...groups.values()].sort((a, b) => {
+      if (!a.importId) return 1;
+      if (!b.importId) return -1;
+      if (a.date && b.date) return new Date(b.date).getTime() - new Date(a.date).getTime();
+      return 0;
+    });
+  }, [patterns]);
+
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+
+  function toggleGroup(key: string) {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   }
 
   const selectedPattern = patterns.find((p) => p.id === selectedPatternId);
@@ -122,6 +245,44 @@ export function PatternView({ workspaceId, onBack }: PatternViewProps) {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            {/* Provider toggle */}
+            <div className="flex items-center rounded-full border border-white/15 p-0.5">
+              {(["local", "anthropic"] as const).map((p) => {
+                const info = providers[p];
+                const isActive = aiProvider === p;
+                const isAvailable = info?.available ?? false;
+                return (
+                  <button
+                    key={p}
+                    className={`rounded-full px-3 py-1.5 text-[11px] font-semibold tracking-wide transition ${
+                      isActive
+                        ? "bg-white/15 text-white"
+                        : isAvailable
+                        ? "text-white/40 hover:text-white/70"
+                        : "cursor-not-allowed text-white/20 line-through"
+                    }`}
+                    onClick={() => isAvailable && setAiProvider(p)}
+                    disabled={!isAvailable || aiRunning}
+                    title={
+                      !isAvailable
+                        ? p === "local"
+                          ? "Starta llama-server först"
+                          : "ANTHROPIC_API_KEY saknas"
+                        : info?.label
+                    }
+                    type="button"
+                  >
+                    {p === "local" ? "Lokal" : "Claude"}
+                    {isActive && isAvailable && (
+                      <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-[var(--color-mint-400)]" />
+                    )}
+                    {!isAvailable && (
+                      <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-[var(--color-copper-500)]" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
             <button
               className="rounded-full border border-white/15 px-5 py-2.5 text-sm text-white/60 transition hover:bg-white/5 hover:text-white disabled:opacity-50"
               onClick={handleDetect}
@@ -136,15 +297,103 @@ export function PatternView({ workspaceId, onBack }: PatternViewProps) {
               disabled={aiRunning}
               type="button"
             >
-              {aiRunning ? "AI analyserar..." : "AI-analys"}
+              {aiRunning
+                ? `${aiProvider === "local" ? "Ministral" : "Claude"} analyserar...`
+                : "AI-analys"}
             </button>
           </div>
         </header>
 
+        {/* Context — stored on workspace, set at import or here */}
+        <div className="mt-3">
+          <button
+            className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.2em] text-white/40 transition hover:text-white/70"
+            onClick={() => setShowContext(!showContext)}
+            type="button"
+          >
+            <span className={`inline-block transition-transform ${showContext ? "rotate-90" : ""}`}>▸</span>
+            Datakontext{systemContext && !showContext ? ` — "${systemContext.slice(0, 60)}${systemContext.length > 60 ? "…" : ""}"` : ""}
+          </button>
+          {showContext && (
+            <div className="mt-2">
+              <textarea
+                className="w-full resize-none rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-white/30 outline-none transition focus:border-[var(--color-mint-400)]/30 focus:bg-white/8"
+                rows={2}
+                placeholder='T.ex. "Supportärenden från ett kollektivtrafikföretag som utvecklar realtidssystem"'
+                value={systemContext}
+                onChange={(e) => setSystemContext(e.target.value)}
+              />
+              <div className="mt-1.5 flex items-center gap-3">
+                <button
+                  className="rounded-full border border-white/15 px-3 py-1 text-[11px] text-white/50 transition hover:bg-white/5 hover:text-white/80 disabled:opacity-50"
+                  onClick={async () => {
+                    setSavingContext(true);
+                    await api(`/api/workspaces/${workspaceId}`, {
+                      method: "PATCH",
+                      body: JSON.stringify({ systemContext: systemContext.trim() }),
+                    });
+                    setSavingContext(false);
+                  }}
+                  disabled={savingContext}
+                  type="button"
+                >
+                  {savingContext ? "Sparar..." : "Spara"}
+                </button>
+                <p className="text-[10px] text-white/30">
+                  Sätts vanligtvis vid import. Används av all AI-analys.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Progress overlay */}
+        {(detecting || aiRunning) && (
+          <div className="mt-4 rounded-[2rem] border border-[var(--color-mint-400)]/20 bg-white/5 p-6 backdrop-blur-sm">
+            <div className="flex items-center gap-4">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--color-mint-400)] border-t-transparent" />
+              <div className="flex-1">
+                <p className="font-mono text-xs uppercase tracking-[0.24em] text-[var(--color-mint-300)]">
+                  {detecting
+                    ? "Kör tagg-baserad detektion..."
+                    : `${aiProvider === "local" ? "Ministral (offline)" : "Claude"} — Steg ${aiStep} av ${aiTotalSteps}: ${AI_STEPS[aiStep - 1]?.label ?? "Förbereder..."}`}
+                </p>
+                {aiStepResult && (
+                  <p className="mt-1 font-mono text-[10px] tracking-wide text-[var(--color-mint-400)]/70">
+                    Föregående: {aiStepResult}
+                  </p>
+                )}
+                {aiRunning && (
+                  <div className="mt-3 flex gap-1.5">
+                    {AI_STEPS.map((step, i) => (
+                      <div key={step.key} className="flex-1">
+                        <div
+                          className={`h-1.5 rounded-full transition-all duration-500 ${
+                            i + 1 < aiStep
+                              ? "bg-[var(--color-mint-400)]"
+                              : i + 1 === aiStep
+                              ? "animate-pulse bg-[var(--color-mint-400)]/60"
+                              : "bg-white/10"
+                          }`}
+                        />
+                        <p className={`mt-1.5 text-[10px] tracking-wide ${
+                          i + 1 <= aiStep ? "text-white/70" : "text-white/30"
+                        }`}>
+                          {step.label}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Content */}
         <div className="mt-4 grid gap-4 xl:grid-cols-[1fr_480px]">
-          {/* Pattern list */}
-          <div className="grid gap-4">
+          {/* Pattern list — grouped by import */}
+          <div className="flex flex-col gap-3 self-start">
             {patterns.length === 0 ? (
               <div className="rounded-[2rem] border border-dashed border-white/14 bg-black/8 p-12 text-center">
                 <p className="font-mono text-xs uppercase tracking-[0.24em] text-[var(--color-mint-300)]">
@@ -155,67 +404,89 @@ export function PatternView({ workspaceId, onBack }: PatternViewProps) {
                 </p>
               </div>
             ) : (
-              patterns.map((pattern) => (
-                <button
-                  key={pattern.id}
-                  className={`w-full rounded-[1.75rem] border p-5 text-left transition ${
-                    pattern.id === selectedPatternId
-                      ? "border-[var(--color-mint-400)]/40 bg-white/10"
-                      : "border-white/10 bg-white/5 hover:bg-white/8"
-                  }`}
-                  onClick={() => setSelectedPatternId(pattern.id)}
-                  type="button"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="text-lg font-semibold text-white">{pattern.title}</h3>
-                      {pattern.description && (
-                        <p className="mt-1 text-sm text-white/60">{pattern.description}</p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="rounded-full bg-white/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em]">
-                        {pattern.occurrenceCount}x
+              groupedPatterns.map((group) => {
+                const groupKey = group.importId ?? "__no_import__";
+                const isCollapsed = collapsedGroups.has(groupKey);
+                return (
+                  <div key={groupKey} className="rounded-[1.5rem] border border-white/8 bg-white/[0.03]">
+                    {/* Group header */}
+                    <button
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left"
+                      onClick={() => toggleGroup(groupKey)}
+                      type="button"
+                    >
+                      <span className={`text-[10px] text-white/40 transition-transform ${isCollapsed ? "" : "rotate-90"}`}>
+                        ▸
                       </span>
-                      <span
-                        className={`rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
-                          pattern.status === "EMERGING"
-                            ? "bg-[var(--color-copper-500)]/20 text-[var(--color-copper-400)]"
-                            : pattern.status === "CONFIRMED"
-                            ? "bg-[var(--color-mint-400)]/20 text-[var(--color-mint-300)]"
-                            : pattern.status === "ADDRESSED"
-                            ? "bg-[var(--color-sky-400)]/20 text-[var(--color-sky-400)]"
-                            : "bg-white/10 text-white/50"
-                        }`}
-                      >
-                        {STATUS_LABELS[pattern.status] ?? pattern.status}
+                      <div className="flex-1 min-w-0">
+                        <p className="truncate font-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-mint-300)]">
+                          {group.label}
+                        </p>
+                        <p className="mt-0.5 text-[10px] text-white/35">
+                          {group.patterns.length} mönster
+                          {group.date && ` · importerad ${formatDate(group.date)}`}
+                        </p>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-white/8 px-2 py-0.5 text-[10px] font-semibold text-white/50">
+                        {group.patterns.reduce((sum, p) => sum + p.patternChallenges.length, 0)} utmaningar
                       </span>
-                    </div>
+                    </button>
+
+                    {/* Group patterns */}
+                    {!isCollapsed && (
+                      <div className="flex flex-col gap-1.5 px-2 pb-2">
+                        {group.patterns.map((pattern) => (
+                          <button
+                            key={pattern.id}
+                            className={`w-full rounded-xl border px-3.5 py-2.5 text-left transition ${
+                              pattern.id === selectedPatternId
+                                ? "border-[var(--color-mint-400)]/40 bg-white/10"
+                                : "border-white/6 bg-white/[0.04] hover:bg-white/8"
+                            }`}
+                            onClick={() => setSelectedPatternId(pattern.id)}
+                            type="button"
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <h3 className="text-sm font-semibold text-white truncate">{pattern.title}</h3>
+                              <div className="flex shrink-0 items-center gap-1.5">
+                                <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em]">
+                                  {pattern.occurrenceCount}x
+                                </span>
+                                <span
+                                  className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ${
+                                    pattern.status === "EMERGING"
+                                      ? "bg-[var(--color-copper-500)]/20 text-[var(--color-copper-400)]"
+                                      : pattern.status === "CONFIRMED"
+                                      ? "bg-[var(--color-mint-400)]/20 text-[var(--color-mint-300)]"
+                                      : pattern.status === "ADDRESSED"
+                                      ? "bg-[var(--color-sky-400)]/20 text-[var(--color-sky-400)]"
+                                      : "bg-white/10 text-white/50"
+                                  }`}
+                                >
+                                  {STATUS_LABELS[pattern.status] ?? pattern.status}
+                                </span>
+                                {pattern.crmEvidence && pattern.crmEvidence.length > 0 && (
+                                  <span className="rounded-full bg-[var(--color-sky-400)]/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--color-sky-400)]">
+                                    CRM
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+                              <span className="text-[10px] uppercase tracking-[0.14em] text-white/40">
+                                {TYPE_LABELS[pattern.patternType] ?? pattern.patternType}
+                              </span>
+                              <span className="text-[10px] uppercase tracking-[0.14em] text-white/40">
+                                {pattern.patternChallenges.length} utmaning{pattern.patternChallenges.length !== 1 ? "ar" : ""}
+                              </span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <span className="text-[10px] uppercase tracking-[0.14em] text-white/40">
-                      {TYPE_LABELS[pattern.patternType] ?? pattern.patternType}
-                    </span>
-                    <span className="text-[10px] uppercase tracking-[0.14em] text-white/40">
-                      Senast: {formatDate(pattern.lastSeenAt)}
-                    </span>
-                    <span className="text-[10px] uppercase tracking-[0.14em] text-white/40">
-                      {pattern.patternChallenges.length} kopplad{pattern.patternChallenges.length !== 1 ? "e" : ""} utmaning{pattern.patternChallenges.length !== 1 ? "ar" : ""}
-                    </span>
-                  </div>
-                  {/* CRM evidence preview */}
-                  {pattern.crmEvidence && pattern.crmEvidence.length > 0 && (
-                    <div className="mt-3 rounded-xl border border-[var(--color-sky-400)]/20 bg-[var(--color-sky-400)]/5 p-3">
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--color-sky-400)]">
-                        CRM-data
-                      </p>
-                      <p className="mt-1 text-sm text-white/70">
-                        {pattern.crmEvidence[0].narrative}
-                      </p>
-                    </div>
-                  )}
-                </button>
-              ))
+                );
+              })
             )}
           </div>
 

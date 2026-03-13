@@ -26,6 +26,12 @@ export type TagData = {
   source: string;
 };
 
+export type ImportData = {
+  id: string;
+  sourceLabel: string;
+  createdAt: string;
+};
+
 export type ChallengeData = {
   id: string;
   contentRaw: string;
@@ -34,6 +40,8 @@ export type ChallengeData = {
   status: string;
   createdAt: string;
   sessionId: string | null;
+  importId?: string | null;
+  import?: ImportData | null;
   tags?: { tag: TagData }[];
 };
 

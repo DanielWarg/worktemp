@@ -1,12 +1,11 @@
-import { getAnthropicClient } from "./client";
+import { localChat } from "./local-client";
 import { prisma } from "@/lib/db/prisma";
 import { contextPrefix } from "./context";
 import { chunk } from "./chunk";
 
 const BATCH_SIZE = 8;
 
-// Generate actionable suggestions for existing patterns
-export async function generateSuggestions(workspaceId: string, systemContext = "") {
+export async function generateSuggestionsLocal(workspaceId: string, systemContext = "") {
   const patterns = await prisma.pattern.findMany({
     where: {
       workspaceId,
@@ -26,7 +25,6 @@ export async function generateSuggestions(workspaceId: string, systemContext = "
 
   if (patterns.length === 0) return { generated: 0 };
 
-  const client = getAnthropicClient();
   const batches = chunk(patterns, BATCH_SIZE);
   let totalGenerated = 0;
 
@@ -40,13 +38,10 @@ export async function generateSuggestions(workspaceId: string, systemContext = "
       })
       .join("\n\n");
 
-    const response = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 2000,
-      messages: [
-        {
-          role: "user",
-          content: `${contextPrefix(systemContext)}Du är en teamcoach. Ge konkreta, handlingsbara förslag för varje identifierat mönster.
+    const text = await localChat([
+      {
+        role: "user",
+        content: `${contextPrefix(systemContext)}Du är en teamcoach. Ge konkreta, handlingsbara förslag för varje identifierat mönster.
 Varje förslag ska vara specifikt och kunna genomföras inom en vecka.
 
 Mönster:
@@ -54,11 +49,8 @@ ${patternTexts}
 
 Svara i JSON-format:
 [{"patternIndex": 0, "suggestions": ["Förslag 1", "Förslag 2"]}, ...]`,
-        },
-      ],
-    });
-
-    const text = response.content[0]?.type === "text" ? response.content[0].text : "";
+      },
+    ]);
 
     let results: { patternIndex: number; suggestions: string[] }[];
     try {

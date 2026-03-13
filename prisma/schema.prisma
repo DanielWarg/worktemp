@@ -23,11 +23,12 @@ model Account {
 }
 
 model Workspace {
-  id        String   @id @default(cuid())
-  name      String
-  ownerId   String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String   @id @default(cuid())
+  name          String
+  ownerId       String
+  systemContext String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   owner          Account          @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   teams          Team[]
@@ -192,6 +193,7 @@ model Challenge {
   sessionId          String?
   personId           String
   workspaceId        String
+  importId           String?
   contentRaw         String
   contentNormalized  String?
   sourceType         String   @default("MEETING") // MEETING | HISTORICAL | IMPORT | BETWEEN_MEETINGS
@@ -199,15 +201,17 @@ model Challenge {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
-  session           MeetingSession?  @relation(fields: [sessionId], references: [id], onDelete: SetNull)
-  person            Person           @relation(fields: [personId], references: [id], onDelete: Cascade)
-  workspace         Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  session           MeetingSession?   @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  person            Person            @relation(fields: [personId], references: [id], onDelete: Cascade)
+  workspace         Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  import            HistoricalImport? @relation(fields: [importId], references: [id], onDelete: SetNull)
   tags              ChallengeTag[]
   patternChallenges PatternChallenge[]
 
   @@index([workspaceId, status])
   @@index([personId, createdAt])
   @@index([sessionId])
+  @@index([importId])
 }
 
 // ── Fas 2: Tags, Patterns, Historical Import ────────────────────
@@ -248,7 +252,8 @@ model HistoricalImport {
   status       String   @default("PENDING") // PENDING | PROCESSING | COMPLETED | FAILED
   createdAt    DateTime @default(now())
 
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace   Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  challenges  Challenge[]
 
   @@index([workspaceId])
 }

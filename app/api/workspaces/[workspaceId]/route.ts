@@ -43,3 +43,27 @@ export async function GET(
 
   return NextResponse.json(workspace);
 }
+
+// PATCH /api/workspaces/:id — update workspace fields
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ workspaceId: string }> }
+) {
+  const { workspaceId } = await params;
+  const body = await request.json();
+
+  const data: Record<string, unknown> = {};
+  if (typeof body.name === "string") data.name = body.name;
+  if (typeof body.systemContext === "string") data.systemContext = body.systemContext;
+
+  if (Object.keys(data).length === 0) {
+    return NextResponse.json({ error: "No fields to update" }, { status: 400 });
+  }
+
+  const workspace = await prisma.workspace.update({
+    where: { id: workspaceId },
+    data,
+  });
+
+  return NextResponse.json(workspace);
+}

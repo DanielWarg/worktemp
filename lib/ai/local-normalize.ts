@@ -1,32 +1,27 @@
-import { getAnthropicClient } from "./client";
+import { localChat } from "./local-client";
 import { prisma } from "@/lib/db/prisma";
 import { contextPrefix } from "./context";
 import { chunk } from "./chunk";
 
 const BATCH_SIZE = 40;
 
-// Normalize raw challenge text: clean up, standardize, extract key meaning
-export async function normalizeChallenges(workspaceId: string, systemContext = "") {
+export async function normalizeChallengesLocal(workspaceId: string, systemContext = "") {
   const challenges = await prisma.challenge.findMany({
     where: { workspaceId, contentNormalized: null },
   });
 
   if (challenges.length === 0) return { processed: 0 };
 
-  const client = getAnthropicClient();
   const batches = chunk(challenges, BATCH_SIZE);
   let totalUpdated = 0;
 
   for (const batch of batches) {
     const challengeTexts = batch.map((c, i) => `${i + 1}. "${c.contentRaw}"`).join("\n");
 
-    const response = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 2000,
-      messages: [
-        {
-          role: "user",
-          content: `${contextPrefix(systemContext)}Du är en textanalytiker. Normalisera följande utmaningar som fångats i teammöten.
+    const text = await localChat([
+      {
+        role: "user",
+        content: `${contextPrefix(systemContext)}Du är en textanalytiker. Normalisera följande utmaningar som fångats i teammöten.
 För varje utmaning, ge en kort, ren, standardiserad version som bevarar kärnbetydelsen.
 Ta bort fyllnadsord, talspråk och upprepningar. Behåll den specifika innebörden.
 
@@ -35,11 +30,8 @@ ${challengeTexts}
 
 Svara i JSON-format som en array av strängar, en per utmaning, i samma ordning:
 ["normaliserad 1", "normaliserad 2", ...]`,
-        },
-      ],
-    });
-
-    const text = response.content[0]?.type === "text" ? response.content[0].text : "";
+      },
+    ]);
 
     let normalized: string[];
     try {
