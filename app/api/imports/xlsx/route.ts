@@ -123,7 +123,11 @@ export async function POST(request: Request) {
 
   if (mode === "preview") {
     // Return parsed summary without saving
-    const owners = [...new Set(rows.map((r) => r.owner).filter(Boolean))];
+    const ownerCounts = new Map<string, number>();
+    for (const r of rows) {
+      if (r.owner) ownerCounts.set(r.owner, (ownerCounts.get(r.owner) ?? 0) + 1);
+    }
+    const owners = [...ownerCounts.entries()].map(([name, count]) => ({ name, count }));
     const accounts = [...new Set(rows.map((r) => r.account).filter(Boolean))];
     const statuses = [...new Set(rows.map((r) => r.status).filter(Boolean))];
     const types = [
@@ -159,6 +163,13 @@ export async function POST(request: Request) {
     );
   }
 
+  // Filter out excluded owners
+  const excludeOwnersRaw = formData.get("excludeOwners") as string | null;
+  const excludeOwners = new Set(excludeOwnersRaw ? JSON.parse(excludeOwnersRaw) as string[] : []);
+  const filteredRows = excludeOwners.size > 0
+    ? rows.filter((r) => !excludeOwners.has(r.owner))
+    : rows;
+
   // Find or create a team for the import
   let targetTeamId = teamId;
   if (!targetTeamId) {
@@ -172,8 +183,8 @@ export async function POST(request: Request) {
     targetTeamId = team.id;
   }
 
-  // Collect unique owner names
-  const ownerNames = [...new Set(rows.map((r) => r.owner || "Ej tilldelad"))];
+  // Collect unique owner names from filtered rows
+  const ownerNames = [...new Set(filteredRows.map((r) => r.owner || "Ej tilldelad"))];
 
   // Find existing persons in one query
   const existingPersons = await prisma.person.findMany({
@@ -202,15 +213,15 @@ export async function POST(request: Request) {
       workspaceId,
       importedById: accountId,
       sourceLabel: file.name,
-      rawContent: `Imported ${rows.length} rows from ${file.name}`,
-      parsedCount: rows.length,
+      rawContent: `Imported ${filteredRows.length} rows from ${file.name}${excludeOwners.size > 0 ? ` (excluded: ${[...excludeOwners].join(", ")})` : ""}`,
+      parsedCount: filteredRows.length,
       status: "COMPLETED",
     },
   });
 
   // Pre-create all unique tags in one pass
   const tagNames = new Set<string>();
-  for (const row of rows) {
+  for (const row of filteredRows) {
     if (row.supportType) tagNames.add(row.supportType);
     if (row.priority) tagNames.add(row.priority);
     if (row.account) tagNames.add(row.account);
@@ -227,7 +238,7 @@ export async function POST(request: Request) {
   }
 
   // Batch-create all challenges
-  const challengeData = rows.map((row) => {
+  const challengeData = filteredRows.map((row) => {
     const person = personMap.get(row.owner || "Ej tilldelad")!;
     return {
       personId: person.id,
@@ -257,7 +268,7 @@ export async function POST(request: Request) {
 
   // Batch-create challenge-tag links
   const tagLinks: { challengeId: string; tagId: string }[] = [];
-  for (const row of rows) {
+  for (const row of filteredRows) {
     const person = personMap.get(row.owner || "Ej tilldelad")!;
     const content = row.title + (row.description ? `\n${row.description.slice(0, 500)}` : "");
     const challengeId = challengeLookup.get(`${person.id}:${content.slice(0, 100)}`);

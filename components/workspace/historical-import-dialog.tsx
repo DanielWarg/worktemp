@@ -15,7 +15,7 @@ type HistoricalImportDialogProps = {
 type XlsxPreview = {
   sheetName: string;
   totalRows: number;
-  owners: string[];
+  owners: { name: string; count: number }[];
   accounts: string[];
   statuses: string[];
   types: string[];
@@ -58,6 +58,7 @@ export function HistoricalImportDialog({
   const [teamId, setTeamId] = useState(teams[0]?.id ?? "");
   const [fileResult, setFileResult] = useState<ImportResult | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [excludedOwners, setExcludedOwners] = useState<Set<string>>(new Set());
 
   async function saveContext() {
     if (dataContext.trim()) {
@@ -106,6 +107,9 @@ export function HistoricalImportDialog({
     form.append("workspaceId", workspaceId);
     form.append("mode", "commit");
     if (teamId) form.append("teamId", teamId);
+    if (excludedOwners.size > 0) {
+      form.append("excludeOwners", JSON.stringify([...excludedOwners]));
+    }
 
     const res = await fetch("/api/imports/xlsx", { method: "POST", body: form });
     const data = await res.json();
@@ -264,59 +268,101 @@ export function HistoricalImportDialog({
               </p>
               <div className="mt-2 flex flex-wrap gap-3 text-xs text-white/60">
                 <span>{preview.totalRows} ärenden</span>
-                <span>{preview.owners.length} ägare</span>
+                <span>{preview.owners.length} ägare{excludedOwners.size > 0 ? ` (${excludedOwners.size} exkl.)` : ""}</span>
                 <span>{preview.accounts.length} kunder</span>
               </div>
             </div>
 
-            {/* Sample rows */}
-            <div className="max-h-48 overflow-auto rounded-xl border border-white/10 bg-black/20">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-white/10 text-left text-white/50">
-                    <th className="px-3 py-2">Ärende</th>
-                    <th className="px-3 py-2">Rubrik</th>
-                    <th className="px-3 py-2">Ägare</th>
-                    <th className="px-3 py-2">Kund</th>
-                    <th className="px-3 py-2">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {preview.sampleRows.map((row) => (
-                    <tr
-                      key={row.caseNumber}
-                      className="border-b border-white/5 text-white/70"
-                    >
-                      <td className="px-3 py-2 font-mono">{row.caseNumber}</td>
-                      <td className="max-w-[200px] truncate px-3 py-2">
-                        {row.title}
-                      </td>
-                      <td className="px-3 py-2">{row.owner}</td>
-                      <td className="max-w-[120px] truncate px-3 py-2">
-                        {row.account}
-                      </td>
-                      <td className="px-3 py-2">{row.status}</td>
+            {/* Sample rows — collapsible */}
+            <details className="rounded-xl border border-white/10 bg-black/20">
+              <summary className="cursor-pointer px-4 py-2.5 text-[11px] uppercase tracking-[0.14em] text-white/40 hover:text-white/60">
+                Visa exempelrader ({preview.sampleRows.length} av {preview.totalRows})
+              </summary>
+              <div className="max-h-48 overflow-auto border-t border-white/8">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-white/10 text-left text-white/50">
+                      <th className="px-3 py-2">Ärende</th>
+                      <th className="px-3 py-2">Rubrik</th>
+                      <th className="px-3 py-2">Ägare</th>
+                      <th className="px-3 py-2">Kund</th>
+                      <th className="px-3 py-2">Status</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {preview.sampleRows.map((row) => (
+                      <tr
+                        key={row.caseNumber}
+                        className="border-b border-white/5 text-white/70"
+                      >
+                        <td className="px-3 py-2 font-mono">{row.caseNumber}</td>
+                        <td className="max-w-[200px] truncate px-3 py-2">
+                          {row.title}
+                        </td>
+                        <td className="px-3 py-2">{row.owner}</td>
+                        <td className="max-w-[120px] truncate px-3 py-2">
+                          {row.account}
+                        </td>
+                        <td className="px-3 py-2">{row.status}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </details>
 
-            {/* Owners that will be created */}
+            {/* Owners — checkboxes to include/exclude */}
             <div className="rounded-xl border border-white/10 bg-black/20 p-4">
               <p className="text-xs uppercase tracking-[0.14em] text-white/50">
                 Personer som skapas (ägare)
               </p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {preview.owners.map((o) => (
-                  <span
-                    key={o}
-                    className="rounded-full bg-[var(--color-mint-400)]/15 px-3 py-1 text-xs text-[var(--color-mint-300)]"
-                  >
-                    {o}
-                  </span>
-                ))}
+              <p className="mt-1 text-[10px] text-white/30">
+                Avmarkera personer som inte ska importeras (t.ex. generiska konton).
+              </p>
+              <div className="mt-3 grid gap-1.5">
+                {preview.owners.map((o) => {
+                  const isExcluded = excludedOwners.has(o.name);
+                  return (
+                    <label
+                      key={o.name}
+                      className={`flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 transition ${
+                        isExcluded
+                          ? "bg-white/[0.02] opacity-50"
+                          : "bg-[var(--color-mint-400)]/8 hover:bg-[var(--color-mint-400)]/12"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={!isExcluded}
+                        onChange={() => {
+                          setExcludedOwners((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(o.name)) next.delete(o.name);
+                            else next.add(o.name);
+                            return next;
+                          });
+                        }}
+                        className="h-4 w-4 rounded border-white/30 accent-[var(--color-mint-400)]"
+                      />
+                      <span className={`flex-1 text-sm ${isExcluded ? "line-through text-white/40" : "text-white"}`}>
+                        {o.name}
+                      </span>
+                      <span className="text-[10px] text-white/40">
+                        {o.count} ärenden
+                      </span>
+                    </label>
+                  );
+                })}
               </div>
+              {excludedOwners.size > 0 && (
+                <p className="mt-2 text-[11px] text-[var(--color-copper-400)]">
+                  {excludedOwners.size} person{excludedOwners.size > 1 ? "er" : ""} exkluderad{excludedOwners.size > 1 ? "e" : ""} —{" "}
+                  {preview.owners
+                    .filter((o) => excludedOwners.has(o.name))
+                    .reduce((sum, o) => sum + o.count, 0)}{" "}
+                  ärenden hoppas över
+                </p>
+              )}
             </div>
 
             {/* Team selector */}
@@ -347,7 +393,7 @@ export function HistoricalImportDialog({
               >
                 {importing
                   ? "Importerar..."
-                  : `Importera ${preview.totalRows} ärenden`}
+                  : `Importera ${preview.totalRows - preview.owners.filter((o) => excludedOwners.has(o.name)).reduce((s, o) => s + o.count, 0)} ärenden`}
               </button>
               <CancelButton onClick={onClose} />
             </div>
@@ -455,9 +501,9 @@ function Overlay({
   wide?: boolean;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/60 py-6 backdrop-blur-sm">
       <div
-        className={`mx-4 w-full rounded-[2rem] border border-white/10 bg-[var(--color-green-900)] p-6 text-white shadow-2xl ${
+        className={`mx-4 my-auto w-full max-h-[calc(100vh-3rem)] overflow-y-auto rounded-[2rem] border border-white/10 bg-[var(--color-green-900)] p-6 text-white shadow-2xl ${
           wide ? "max-w-2xl" : "max-w-lg"
         }`}
       >
