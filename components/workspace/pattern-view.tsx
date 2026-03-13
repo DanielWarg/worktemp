@@ -35,7 +35,10 @@ export function PatternView({ workspaceId, onBack }: PatternViewProps) {
   const [aiTotalSteps] = useState(4);
   const [aiStepResult, setAiStepResult] = useState<string | null>(null);
   const [selectedPatternId, setSelectedPatternId] = useState<string | null>(null);
-  const [aiProvider, setAiProvider] = useState<AiProvider>("anthropic");
+  const [aiProvider, setAiProvider] = useState<AiProvider>("local");
+  const [cloudUnlocked, setCloudUnlocked] = useState(false);
+  const [showCloudWarning, setShowCloudWarning] = useState(false);
+  const [cloudConfirmInput, setCloudConfirmInput] = useState("");
   const [providers, setProviders] = useState<Record<string, ProviderStatus>>({});
   const [systemContext, setSystemContext] = useState("");
   const [showContext, setShowContext] = useState(false);
@@ -247,41 +250,60 @@ export function PatternView({ workspaceId, onBack }: PatternViewProps) {
           <div className="flex items-center gap-3">
             {/* Provider toggle */}
             <div className="flex items-center rounded-full border border-white/15 p-0.5">
-              {(["local", "anthropic"] as const).map((p) => {
-                const info = providers[p];
-                const isActive = aiProvider === p;
-                const isAvailable = info?.available ?? false;
-                return (
-                  <button
-                    key={p}
-                    className={`rounded-full px-3 py-1.5 text-[11px] font-semibold tracking-wide transition ${
-                      isActive
-                        ? "bg-white/15 text-white"
-                        : isAvailable
-                        ? "text-white/40 hover:text-white/70"
-                        : "cursor-not-allowed text-white/20 line-through"
-                    }`}
-                    onClick={() => isAvailable && setAiProvider(p)}
-                    disabled={!isAvailable || aiRunning}
-                    title={
-                      !isAvailable
-                        ? p === "local"
-                          ? "Starta llama-server först"
-                          : "ANTHROPIC_API_KEY saknas"
-                        : info?.label
-                    }
-                    type="button"
-                  >
-                    {p === "local" ? "Lokal" : "Claude"}
-                    {isActive && isAvailable && (
-                      <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-[var(--color-mint-400)]" />
-                    )}
-                    {!isAvailable && (
-                      <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-[var(--color-copper-500)]" />
-                    )}
-                  </button>
-                );
-              })}
+              <button
+                className={`rounded-full px-3 py-1.5 text-[11px] font-semibold tracking-wide transition ${
+                  aiProvider === "local"
+                    ? "bg-white/15 text-white"
+                    : providers.local?.available
+                    ? "text-white/40 hover:text-white/70"
+                    : "cursor-not-allowed text-white/20 line-through"
+                }`}
+                onClick={() => providers.local?.available && setAiProvider("local")}
+                disabled={!providers.local?.available || aiRunning}
+                title={!providers.local?.available ? "Starta llama-server först" : "Lokal AI — ingen data lämnar datorn"}
+                type="button"
+              >
+                Lokal
+                {aiProvider === "local" && providers.local?.available && (
+                  <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-[var(--color-mint-400)]" />
+                )}
+                {!providers.local?.available && (
+                  <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-[var(--color-copper-500)]" />
+                )}
+              </button>
+              <button
+                className={`rounded-full px-3 py-1.5 text-[11px] font-semibold tracking-wide transition ${
+                  aiProvider === "anthropic"
+                    ? "bg-[var(--color-copper-500)]/30 text-[var(--color-copper-400)]"
+                    : !providers.anthropic?.available
+                    ? "cursor-not-allowed text-white/20 line-through"
+                    : cloudUnlocked
+                    ? "text-white/40 hover:text-white/70"
+                    : "text-white/25 hover:text-white/40"
+                }`}
+                onClick={() => {
+                  if (!providers.anthropic?.available) return;
+                  if (!cloudUnlocked) {
+                    setShowCloudWarning(true);
+                    return;
+                  }
+                  setAiProvider("anthropic");
+                }}
+                disabled={!providers.anthropic?.available || aiRunning}
+                title={
+                  !providers.anthropic?.available
+                    ? "ANTHROPIC_API_KEY saknas"
+                    : !cloudUnlocked
+                    ? "Klicka för att se varningen"
+                    : "Data skickas till Anthropic"
+                }
+                type="button"
+              >
+                Claude
+                {aiProvider === "anthropic" && (
+                  <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-[var(--color-copper-400)]" />
+                )}
+              </button>
             </div>
             <button
               className="rounded-full border border-white/15 px-5 py-2.5 text-sm text-white/60 transition hover:bg-white/5 hover:text-white disabled:opacity-50"
@@ -385,6 +407,71 @@ export function PatternView({ workspaceId, onBack }: PatternViewProps) {
                     ))}
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Cloud provider warning modal */}
+        {showCloudWarning && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+            <div className="mx-4 w-full max-w-md rounded-[2rem] border border-[var(--color-copper-500)]/30 bg-[var(--color-green-900)] p-6 text-white shadow-2xl">
+              <p className="font-mono text-xs uppercase tracking-[0.3em] text-[var(--color-copper-400)]">
+                Varning: extern AI
+              </p>
+              <div className="mt-4 space-y-3 text-sm leading-6 text-white/80">
+                <p>
+                  Om du aktiverar Claude skickas <strong className="text-white">all data i denna workspace</strong> till
+                  Anthropics servrar (USA) för analys.
+                </p>
+                <p>
+                  Detta inkluderar utmaningar, personnamn, taggar och annan information som finns
+                  i ditt team-radar-konto.
+                </p>
+                <p>
+                  <strong className="text-[var(--color-copper-400)]">
+                    Rekommendation: Använd den lokala AI:n (Ministral) som kör helt offline på din dator.
+                  </strong>
+                </p>
+              </div>
+              <div className="mt-5">
+                <label className="grid gap-2">
+                  <span className="text-[11px] uppercase tracking-[0.14em] text-white/50">
+                    Skriv JAG FÖRSTÅR för att låsa upp
+                  </span>
+                  <input
+                    className="rounded-xl border border-white/12 bg-black/20 px-4 py-2.5 text-sm text-white outline-none placeholder:text-white/25 focus:border-[var(--color-copper-500)]/40"
+                    value={cloudConfirmInput}
+                    onChange={(e) => setCloudConfirmInput(e.target.value)}
+                    placeholder="JAG FÖRSTÅR"
+                    autoFocus
+                  />
+                </label>
+              </div>
+              <div className="mt-5 flex items-center gap-3">
+                <button
+                  className="rounded-full bg-[var(--color-copper-500)] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--color-copper-400)] disabled:opacity-30"
+                  disabled={cloudConfirmInput.trim().toUpperCase() !== "JAG FÖRSTÅR"}
+                  onClick={() => {
+                    setCloudUnlocked(true);
+                    setAiProvider("anthropic");
+                    setShowCloudWarning(false);
+                    setCloudConfirmInput("");
+                  }}
+                  type="button"
+                >
+                  Aktivera Claude
+                </button>
+                <button
+                  className="rounded-full border border-white/15 px-5 py-2.5 text-sm text-white/70 transition hover:bg-white/5"
+                  onClick={() => {
+                    setShowCloudWarning(false);
+                    setCloudConfirmInput("");
+                  }}
+                  type="button"
+                >
+                  Avbryt
+                </button>
               </div>
             </div>
           </div>
