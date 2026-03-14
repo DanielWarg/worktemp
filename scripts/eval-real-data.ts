@@ -239,9 +239,152 @@ async function main() {
     }
   }
 
-  // Results
+  // Results before refine
   console.log("\n" + "═".repeat(62));
-  console.log("RESULTAT");
+  console.log("RESULTAT (före refine)");
+  console.log("═".repeat(62));
+  console.log(`Total tid: ${(totalDuration / 1000).toFixed(1)}s`);
+  console.log(`Parse-fel: ${parseErrors}/${batches.length} batchar\n`);
+
+  const analysisBefore = analyzeResults(allPatterns, tickets.length, validIds);
+  for (const line of analysisBefore) console.log(line);
+
+  // --- Refine step: self-critique + code-based dedup ---
+  console.log("\n" + "═".repeat(62));
+  console.log("REFINE — self-critique + dedup");
+  console.log("═".repeat(62));
+
+  const beforeCount = allPatterns.length;
+  const refineStart = Date.now();
+
+  // Step 1: AI self-critique
+  if (allPatterns.length >= 2) {
+    const patternsForReview = allPatterns
+      .map((p, i) => `${i + 1}. "${p.title}" (${p.patternType}, ${p.challengeIds.length} ärenden)\n   Beskrivning: ${p.description}`)
+      .join("\n");
+
+    try {
+      process.stdout.write("Self-critique... ");
+      const critiqueRes = await fetch(`${LOCAL_URL}/v1/chat/completions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [{
+            role: "user",
+            content: `Du är en kvalitetsgranskare. Granska dessa AI-detekterade mönster och identifiera problem.
+
+Mönster att granska:
+${patternsForReview}
+
+Kontrollera:
+1. DUBBLETTER: Finns mönster som beskriver samma underliggande problem med olika titlar? Var extra uppmärksam på mönster som nämner samma system (t.ex. PubTrans, TIMS, TransitCloud).
+2. STUFFING: Innehåller något mönster ärenden som inte hör dit?
+3. KVALITET: Är beskrivningen tillräckligt specifik?
+
+Returnera JSON-array (inga kommentarer):
+[{
+  "index": 0,
+  "decision": "KEEP",
+  "reason": "Tydligt och unikt mönster"
+},
+{
+  "index": 1,
+  "decision": "MERGE_INTO",
+  "mergeIntoIndex": 0,
+  "reason": "Beskriver samma problem som mönster 1"
+},
+{
+  "index": 2,
+  "decision": "DISCARD",
+  "reason": "För vag beskrivning"
+}]
+
+Beslut per mönster: KEEP (behåll), MERGE_INTO (slå ihop med annat), DISCARD (ta bort).
+Var konservativ — behåll hellre för många än för få. Slå bara ihop vid tydlig överlapp.`,
+          }],
+          max_tokens: 4000,
+          temperature: 0.3,
+          stream: false,
+        }),
+      });
+      const critiqueData = await critiqueRes.json();
+      const critiqueRaw = critiqueData.choices?.[0]?.message?.content ?? "";
+      const critiqueMatch = critiqueRaw.match(/\[[\s\S]*\]/);
+      const critiqueCleaned = critiqueMatch ? critiqueMatch[0].replace(/\/\/[^\n]*/g, "") : null;
+
+      if (critiqueCleaned) {
+        const critiques: { index: number; decision: string; mergeIntoIndex?: number; reason?: string }[] = JSON.parse(critiqueCleaned);
+
+        // Apply merges
+        for (const c of critiques) {
+          if (
+            c.decision === "MERGE_INTO" &&
+            c.mergeIntoIndex != null &&
+            c.mergeIntoIndex >= 0 && c.mergeIntoIndex < allPatterns.length &&
+            c.index >= 0 && c.index < allPatterns.length &&
+            c.index !== c.mergeIntoIndex
+          ) {
+            const target = allPatterns[c.mergeIntoIndex];
+            const source = allPatterns[c.index];
+            for (const id of source.challengeIds) {
+              if (!target.challengeIds.includes(id)) target.challengeIds.push(id);
+            }
+            console.log(`  Merge: "${source.title}" → "${target.title}"`);
+          }
+        }
+
+        const toRemove = new Set(
+          critiques
+            .filter((c) => c.decision === "MERGE_INTO" || c.decision === "DISCARD")
+            .map((c) => c.index)
+        );
+        for (let i = allPatterns.length - 1; i >= 0; i--) {
+          if (toRemove.has(i)) {
+            if (critiques.find((c) => c.index === i)?.decision === "DISCARD") {
+              console.log(`  Discard: "${allPatterns[i].title}"`);
+            }
+            allPatterns.splice(i, 1);
+          }
+        }
+
+        const refineDuration = ((Date.now() - refineStart) / 1000).toFixed(1);
+        console.log(`${critiques.length} granskade, ${toRemove.size} borttagna/mergade (${refineDuration}s)`);
+        totalDuration += Date.now() - refineStart;
+      }
+    } catch (err) {
+      console.log(`Self-critique misslyckades: ${err}`);
+    }
+  }
+
+  // Step 2: Code-based deduplication
+  let codeDeduped = 0;
+  for (let i = allPatterns.length - 1; i >= 1; i--) {
+    const titleA = allPatterns[i].title.toLowerCase().trim();
+    for (let j = 0; j < i; j++) {
+      const titleB = allPatterns[j].title.toLowerCase().trim();
+      const wordsA = new Set(titleA.split(/\s+/));
+      const wordsB = new Set(titleB.split(/\s+/));
+      const overlap = Array.from(wordsA).filter((w: string) => wordsB.has(w)).length;
+      const similarity = overlap / Math.max(wordsA.size, wordsB.size);
+
+      if (titleA.includes(titleB) || titleB.includes(titleA) || similarity > 0.6) {
+        for (const id of allPatterns[i].challengeIds) {
+          if (!allPatterns[j].challengeIds.includes(id)) allPatterns[j].challengeIds.push(id);
+        }
+        console.log(`  Dedup: "${allPatterns[i].title}" → "${allPatterns[j].title}"`);
+        allPatterns.splice(i, 1);
+        codeDeduped++;
+        break;
+      }
+    }
+  }
+  if (codeDeduped > 0) console.log(`Kodbaserad dedup: ${codeDeduped} mergade`);
+
+  console.log(`\nRefine: ${beforeCount} → ${allPatterns.length} mönster (${beforeCount - allPatterns.length} borttagna)`);
+
+  // Results after refine
+  console.log("\n" + "═".repeat(62));
+  console.log("RESULTAT (efter refine)");
   console.log("═".repeat(62));
   console.log(`Total tid: ${(totalDuration / 1000).toFixed(1)}s`);
   console.log(`Parse-fel: ${parseErrors}/${batches.length} batchar\n`);

@@ -8,6 +8,7 @@ import { normalizeChallengesLocal } from "@/lib/ai/local-normalize";
 import { autoTagChallengesLocal } from "@/lib/ai/local-auto-tag";
 import { detectPatternsAILocal } from "@/lib/ai/local-detect-patterns";
 import { generateSuggestionsLocal } from "@/lib/ai/local-suggest";
+import { refinePatternsLocal } from "@/lib/ai/local-refine";
 
 // POST /api/ai/analyze — run AI analysis pipeline for a workspace
 // provider: "anthropic" (default) or "local" (llama.cpp / Ministral)
@@ -31,7 +32,7 @@ export async function POST(request: Request) {
   }
 
   const isLocal = provider === "local";
-  const requestedSteps: string[] = steps ?? ["normalize", "tag", "patterns", "suggestions"];
+  const requestedSteps: string[] = steps ?? ["normalize", "tag", "patterns", "refine", "suggestions"];
   const results: Record<string, unknown> = { provider };
   const warnings: string[] = [];
 
@@ -39,6 +40,7 @@ export async function POST(request: Request) {
     normalize: "Normalisering",
     tag: "Auto-taggning",
     patterns: "Mönsterdetektion",
+    refine: "Mönsterförfining",
     suggestions: "Förslagsgenerering",
   };
 
@@ -65,6 +67,11 @@ export async function POST(request: Request) {
         : await detectPatternsAI(workspaceId, ctx);
       results.patterns = r;
       if (r.failedBatches) warnings.push(`${STEP_LABELS.patterns}: ${r.failedBatches} av ${r.batches} batchar misslyckades`);
+    }
+
+    if (requestedSteps.includes("refine") && isLocal) {
+      const r = await refinePatternsLocal(workspaceId);
+      results.refine = r;
     }
 
     if (requestedSteps.includes("suggestions")) {
