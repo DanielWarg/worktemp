@@ -39,7 +39,7 @@ export function clusterChallenges<T extends ClusterItem>(
 
   // Agglomerative clustering — each item starts as its own cluster
   type Cluster = { indices: number[] };
-  let clusters: Cluster[] = items.map((_, i) => ({ indices: [i] }));
+  const clusters: Cluster[] = items.map((_, i) => ({ indices: [i] }));
 
   // Pre-compute pairwise similarities for efficiency
   while (clusters.length > Math.ceil(n / TARGET_MAX)) {

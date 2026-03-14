@@ -10,6 +10,7 @@ import { writeFileSync } from "fs";
 import { config } from "dotenv";
 import { embedChallenges, type ChallengeForEmbed } from "../lib/ai/embed-challenges";
 import { clusterChallenges } from "../lib/ai/cluster-challenges";
+import { classifyTicket, findDuplicates, buildBatchContext, type TicketClass } from "../lib/ai/pre-classify";
 
 config({ path: new URL("../.env.local", import.meta.url).pathname });
 config({ path: new URL("../.env", import.meta.url).pathname });
@@ -45,22 +46,33 @@ function buildPrompt(
   challenges: { id: string; person: string; tags: string[]; text: string }[],
   existingTitles: string[],
   batchNum: number,
-  totalBatches: number
+  totalBatches: number,
+  classifications: Map<string, { ticketClass: TicketClass; isNoise: boolean }>
 ): string {
+  const batchContext = buildBatchContext(challenges, classifications);
+
   const challengeTexts = challenges
-    .map((c, i) => `${i + 1}. [id:${c.id}] Person: ${c.person} | Taggar: ${c.tags.join(", ")} | "${c.text}"`)
+    .map((c, i) => {
+      const cls = classifications.get(c.id);
+      const classTag = cls ? ` [${cls.ticketClass}]` : "";
+      return `${i + 1}. [id:${c.id}]${classTag} Person: ${c.person} | Taggar: ${c.tags.join(", ")} | "${c.text}"`;
+    })
     .join("\n");
 
   const ctx = "Kontext om datan: Supportärenden från HPTS (Hogia Public Transport Systems) — kollektivtrafikens IT-system inkl. TIMS, PubTrans, TransitCloud, OCA, InGrid, Instant, Rakel.\n\n";
 
   return `${ctx}Du analyserar utmaningar som fångats i teammöten. Identifiera mönster — problem som är återkommande, eskalerande, eller delas av flera personer/team.
 
+${batchContext}
+
 REGLER:
 - Kräv minst 2 challenges per mönster
 - Varje challenge ska bara tillhöra ETT mönster (det mest relevanta)
 - Skapa INTE dubbletter av befintliga mönster
 - Var restriktiv — skapa bara mönster med tydlig tematisk koppling
+- Ärenden markerade [monitoring_alert] eller [duplicate_candidate] utgör sällan egna mönster — inkludera dem bara om de stärker ett reellt mönster
 - Om inga mönster finns, returnera tom array []
+- Ange confidence: "high" om tydlig evidens, "medium" om rimligt, "low" om svagt underlag
 
 Befintliga mönster (skapa inte dubbletter): ${existingTitles.join(", ") || "(inga)"}
 
@@ -73,6 +85,8 @@ Returnera JSON-array (inga kommentarer i JSON):
   "description": "Förklaring av mönstret",
   "patternType": "<välj exakt EN av: RECURRING, ESCALATING, CROSS_PERSON, CROSS_TEAM>",
   "challengeIds": ["id1", "id2"],
+  "evidence": "Konkret bevis: vilka titlar/system/personer som kopplar ihop dessa",
+  "confidence": "<high, medium eller low>",
   "suggestion": "En konkret åtgärd"
 }]`;
 }
@@ -85,6 +99,8 @@ type DetectedPattern = {
   patternType: string;
   challengeIds: string[];
   suggestion: string;
+  evidence?: string;
+  confidence?: string;
 };
 
 async function callLLM(prompt: string): Promise<{ patterns: DetectedPattern[]; raw: string; durationMs: number; parseError?: string }> {
@@ -195,6 +211,14 @@ function analyzeResults(allPatterns: DetectedPattern[], totalTickets: number, va
   for (const p of allPatterns) typeCount[p.patternType] = (typeCount[p.patternType] || 0) + 1;
   lines.push(`Typfördelning: ${Object.entries(typeCount).map(([t, c]) => `${t}=${c}`).join(", ")}`);
 
+  // Confidence distribution
+  const confCount: Record<string, number> = {};
+  for (const p of allPatterns) {
+    const conf = p.confidence || "unset";
+    confCount[conf] = (confCount[conf] || 0) + 1;
+  }
+  lines.push(`Confidence: ${Object.entries(confCount).map(([c, n]) => `${c}=${n}`).join(", ")}`);
+
   return lines;
 }
 
@@ -208,6 +232,25 @@ async function main() {
 
   const tickets = loadTickets();
   console.log(`Laddat ${tickets.length} ärenden\n`);
+
+  // Pre-classify all tickets deterministically
+  const classifications = new Map<string, { ticketClass: TicketClass; isNoise: boolean }>();
+  for (const t of tickets) {
+    classifications.set(t.id, classifyTicket(t.text, t.tags));
+  }
+  const duplicateIds = findDuplicates(tickets.map((t) => ({ id: t.id, text: t.text, person: t.person })));
+  for (const id of duplicateIds) {
+    classifications.set(id, { ticketClass: "duplicate_candidate", isNoise: true });
+  }
+
+  // Log pre-classification stats
+  const classStats = new Map<string, number>();
+  let noiseTotal = 0;
+  for (const [, cls] of classifications) {
+    classStats.set(cls.ticketClass, (classStats.get(cls.ticketClass) || 0) + 1);
+    if (cls.isNoise) noiseTotal++;
+  }
+  console.log(`Pre-klassificering: ${[...classStats.entries()].map(([k, v]) => `${k}=${v}`).join(", ")} (${noiseTotal} brus)\n`);
 
   const useClustering = !process.argv.includes("--no-cluster");
 
@@ -240,7 +283,7 @@ async function main() {
 
   for (let i = 0; i < batches.length; i++) {
     const existingTitles = allPatterns.map((p) => p.title);
-    const prompt = buildPrompt(batches[i], existingTitles, i + 1, batches.length);
+    const prompt = buildPrompt(batches[i], existingTitles, i + 1, batches.length, classifications);
 
     process.stdout.write(`Batch ${i + 1}/${batches.length} (${batches[i].length} ärenden)... `);
     const { patterns, durationMs, parseError } = await callLLM(prompt);
@@ -422,8 +465,10 @@ Var konservativ — behåll hellre för många än för få. Slå bara ihop vid 
   console.log("ALLA MÖNSTER");
   console.log("═".repeat(62));
   for (const p of allPatterns) {
-    console.log(`\n[${p.patternType}] ${p.title} (${p.challengeIds.length} ärenden)`);
+    const conf = p.confidence ? ` [${p.confidence}]` : "";
+    console.log(`\n[${p.patternType}]${conf} ${p.title} (${p.challengeIds.length} ärenden)`);
     console.log(`  ${p.description}`);
+    if (p.evidence) console.log(`  Evidens: ${p.evidence}`);
     console.log(`  Förslag: ${p.suggestion}`);
   }
 

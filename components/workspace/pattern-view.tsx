@@ -80,9 +80,13 @@ export function PatternView({ workspaceId, initialSystemContext, onBack }: Patte
         if (data.providers.local?.available) setAiProvider("local");
       }
     });
-    loadImports();
+    api<{ id: string; sourceLabel: string; parsedCount: number; createdAt: string }[]>(
+      `/api/imports?workspaceId=${workspaceId}`
+    ).then((data) => {
+      if (!cancelled) setImports(data);
+    });
     return () => { cancelled = true; };
-  }, [workspaceId, loadImports]);
+  }, [workspaceId]);
 
   async function handleDeleteImport(importId: string) {
     setDeletingImportId(importId);

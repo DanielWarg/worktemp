@@ -6,7 +6,7 @@
  */
 
 import * as XLSX from "xlsx";
-import { readFileSync, writeFileSync } from "fs";
+import { writeFileSync } from "fs";
 import { config } from "dotenv";
 
 // Load .env from project root
