@@ -2,8 +2,14 @@ import { localChat } from "./local-client";
 import { prisma } from "@/lib/db/prisma";
 import { contextPrefix } from "./context";
 import { chunk } from "./chunk";
-import { embedChallenges, type ChallengeForEmbed } from "./embed-challenges";
 import { clusterChallenges } from "./cluster-challenges";
+
+type ChallengeForEmbed = {
+  id: string;
+  text: string;
+  tags?: string[];
+  person?: string;
+};
 import { classifyTicket, findDuplicates, buildBatchContext, type TicketClass } from "./pre-classify";
 
 const BATCH_SIZE = 50;
@@ -77,6 +83,7 @@ export async function detectPatternsAILocal(workspaceId: string, systemContext =
       tags: c.tags.map((t) => t.tag.name),
       person: c.person.name,
     }));
+    const { embedChallenges } = await import("./embed-challenges");
     const embeddings = await embedChallenges(forEmbed);
     batches = clusterChallenges(challenges, embeddings);
     clusterMethod = "semantic";

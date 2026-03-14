@@ -8,11 +8,9 @@ let pipelinePromise: Promise<any> | null = null;
 
 async function getEmbedder() {
   if (!pipelinePromise) {
-    // Dynamic require to prevent webpack from bundling the heavy ONNX runtime
-    const moduleName = "@huggingface/transformers";
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const m = require(moduleName);
-    pipelinePromise = m.pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2", { dtype: "fp32" });
+    pipelinePromise = import("@huggingface/transformers").then((m) =>
+      m.pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2", { dtype: "fp32" })
+    );
   }
   return pipelinePromise;
 }
