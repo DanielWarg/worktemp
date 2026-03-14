@@ -121,6 +121,111 @@ const SCENARIOS: Scenario[] = [
     ],
     expectedPatternCount: { min: 3, max: 5 },
   },
+  {
+    name: "Stora batchar — 20 ärenden, 4 kluster",
+    context: "Sjukvårds-IT med journalsystem och medicinteknisk utrustning",
+    challenges: [
+      // Kluster 1: Journalsystem (5 st)
+      { id: "c1", person: "Sjuksköterska A", tags: ["Journal"], text: "Journalsystemet loggar ut mig var 5:e minut" },
+      { id: "c2", person: "Läkare B", tags: ["Journal"], text: "Kan inte spara journalanteckningar — timeout efter 30 sekunder" },
+      { id: "c3", person: "Sjuksköterska C", tags: ["Journal"], text: "Journalen visar fel patients data efter byte av flik" },
+      { id: "c4", person: "Läkare D", tags: ["Journal"], text: "Sökfunktionen i journalsystemet hittar inte gamla anteckningar" },
+      { id: "c5", person: "Sjuksköterska A", tags: ["Journal"], text: "Journalsystemet kraschar vid utskrift av sammanfattning" },
+      // Kluster 2: Labbutrustning (4 st)
+      { id: "c6", person: "Labbtek E", tags: ["Labb"], text: "Blodprovsanalysatorn ger felkod E-47 och stannar" },
+      { id: "c7", person: "Labbtek F", tags: ["Labb"], text: "Analysresultat överförs inte automatiskt till journalsystemet" },
+      { id: "c8", person: "Labbtek E", tags: ["Labb"], text: "Centrifugen vibrerar onormalt vid höga varvtal" },
+      { id: "c9", person: "Labbtek G", tags: ["Labb"], text: "Provrörsscannern läser inte streckkoder korrekt" },
+      // Kluster 3: Schemaläggning (4 st)
+      { id: "c10", person: "Chef H", tags: ["Schema"], text: "Schemasystemet räknar fel på övertid" },
+      { id: "c11", person: "Chef I", tags: ["Schema"], text: "Kan inte boka in vikarier via schemasystemet — knappen gråad" },
+      { id: "c12", person: "Sjuksköterska A", tags: ["Schema"], text: "Mitt schema visas inte för nästa vecka trots att det är publicerat" },
+      { id: "c13", person: "Läkare B", tags: ["Schema"], text: "Semesteransökan försvann ur schemasystemet efter godkännande" },
+      // Kluster 4: Nätverksinfrastruktur (3 st)
+      { id: "c14", person: "IT-support", tags: ["Nätverk"], text: "WiFi på avdelning 4B tappar anslutning varje förmiddag" },
+      { id: "c15", person: "IT-support", tags: ["Nätverk"], text: "VPN till hemarbete fungerar inte sedan routerbytet" },
+      { id: "c16", person: "Sjuksköterska C", tags: ["Nätverk"], text: "Surfplattorna på ronden förlorar nätverket i hiss och källare" },
+      // Brus (4 st — ska INTE bilda mönster)
+      { id: "c17", person: "Vaktmästare", tags: ["Övrigt"], text: "Kaffemaskinen på plan 2 läcker" },
+      { id: "c18", person: "Chef H", tags: ["Övrigt"], text: "Behöver beställa nya ID-brickor till sommarvikarier" },
+      { id: "c19", person: "Läkare D", tags: ["Övrigt"], text: "Projektorn i konferensrummet har dålig upplösning" },
+      { id: "c20", person: "Sjuksköterska C", tags: ["Övrigt"], text: "Önskar ergonomiska stolar till nattsköterskorna" },
+    ],
+    expected: [
+      { titleKeywords: ["journal"], mustInclude: ["c1", "c2", "c3"], mustExclude: ["c6", "c10", "c17"], expectedType: "RECURRING" },
+      { titleKeywords: ["labb", "analys", "utrustning"], mustInclude: ["c6", "c7"], mustExclude: ["c1", "c10", "c17"], expectedType: "RECURRING" },
+      { titleKeywords: ["schema"], mustInclude: ["c10", "c11"], mustExclude: ["c1", "c6", "c17"], expectedType: "RECURRING" },
+      { titleKeywords: ["nätverk", "wifi", "anslutning"], mustInclude: ["c14", "c15"], mustExclude: ["c1", "c6", "c17"], expectedType: "RECURRING" },
+    ],
+    expectedPatternCount: { min: 3, max: 6 },
+  },
+  {
+    name: "Vaga beskrivningar — svår att tolka",
+    context: "Interna förbättringsförslag från ett konsultbolag",
+    challenges: [
+      { id: "c1", person: "Konsult A", tags: ["Process"], text: "Det tar för lång tid" },
+      { id: "c2", person: "Konsult B", tags: ["Process"], text: "Processen är omständlig och krånglig" },
+      { id: "c3", person: "Konsult C", tags: ["Process"], text: "Vi gör samma sak flera gånger i onödan" },
+      { id: "c4", person: "Konsult A", tags: ["Verktyg"], text: "Systemet fungerar dåligt" },
+      { id: "c5", person: "Konsult D", tags: ["Verktyg"], text: "Verktygen vi använder är föråldrade" },
+      { id: "c6", person: "Konsult B", tags: ["Kultur"], text: "Vi pratar aldrig om problemen" },
+    ],
+    expected: [
+      { titleKeywords: ["process", "tid", "ineffektiv"], mustInclude: ["c1", "c2", "c3"], mustExclude: ["c4", "c6"], expectedType: "RECURRING" },
+      { titleKeywords: ["verktyg", "system"], mustInclude: ["c4", "c5"], mustExclude: ["c1", "c6"], expectedType: "RECURRING" },
+    ],
+    expectedPatternCount: { min: 1, max: 3 },
+  },
+  {
+    name: "Samma person, samma problem — inte cross-person",
+    context: "Buggrapporter från en ensam testare",
+    challenges: [
+      { id: "c1", person: "Testare Kim", tags: ["Login"], text: "Login-sidan ger 500-fel vid specialtecken i lösenord" },
+      { id: "c2", person: "Testare Kim", tags: ["Login"], text: "Inloggning med SSO redirectar till fel sida" },
+      { id: "c3", person: "Testare Kim", tags: ["Login"], text: "Glömt lösenord-flödet skickar ingen mejl" },
+      { id: "c4", person: "Testare Kim", tags: ["Checkout"], text: "Varukorgen försvinner efter siduppdatering" },
+      { id: "c5", person: "Testare Kim", tags: ["Checkout"], text: "Rabattkod appliceras inte på redan nedsatta varor" },
+    ],
+    expected: [
+      { titleKeywords: ["login", "inloggning", "autentisering"], mustInclude: ["c1", "c2", "c3"], mustExclude: ["c4"], expectedType: "RECURRING" },
+      { titleKeywords: ["checkout", "varukorg", "kassa"], mustInclude: ["c4", "c5"], mustExclude: ["c1"], expectedType: "RECURRING" },
+    ],
+    expectedPatternCount: { min: 2, max: 3 },
+  },
+  {
+    name: "Flerspråkig input — svenska och engelska blandat",
+    context: "Internationellt utvecklingsteam med svensk och engelsk kommunikation",
+    challenges: [
+      { id: "c1", person: "Dev SE", tags: ["Deploy"], text: "Deploy-pipelinen failar på staging med exit code 137 (OOM)" },
+      { id: "c2", person: "Dev EN", tags: ["Deploy"], text: "Deployment keeps timing out on staging environment" },
+      { id: "c3", person: "Dev SE", tags: ["Deploy"], text: "Kan inte deploya till staging — bygget kraschar efter 20 min" },
+      { id: "c4", person: "Dev EN", tags: ["Testing"], text: "Flaky tests in CI — intermittent failures on database tests" },
+      { id: "c5", person: "Dev SE", tags: ["Testing"], text: "Instabila tester som ibland failar pga race conditions" },
+      { id: "c6", person: "Dev EN", tags: ["Testing"], text: "Test suite takes 45 minutes, blocking PRs" },
+    ],
+    expected: [
+      { titleKeywords: ["deploy", "staging", "pipeline"], mustInclude: ["c1", "c2", "c3"], mustExclude: ["c4"], expectedType: "RECURRING" },
+      { titleKeywords: ["test", "CI", "instabil", "flaky"], mustInclude: ["c4", "c5"], mustExclude: ["c1"], expectedType: "RECURRING" },
+    ],
+    expectedPatternCount: { min: 2, max: 3 },
+  },
+  {
+    name: "Överlappande teman — ska INTE skapa dubbletter",
+    context: "E-handelsplattform med betalnings- och orderproblem",
+    challenges: [
+      { id: "c1", person: "Support A", tags: ["Betalning"], text: "Klarna-betalningar misslyckas med felkod 409" },
+      { id: "c2", person: "Support B", tags: ["Betalning"], text: "Kunder får dubbeldebiteringar vid Klarna-checkout" },
+      { id: "c3", person: "Support A", tags: ["Betalning"], text: "Klarna faktura skapas men ordern registreras inte" },
+      { id: "c4", person: "Support C", tags: ["Order"], text: "Order skapas utan orderbekräftelse-mejl" },
+      { id: "c5", person: "Support B", tags: ["Order"], text: "Orderstatus fastnar på 'Behandlas' trots levererad vara" },
+      { id: "c6", person: "Support A", tags: ["Order"], text: "Returer syns inte i ordersystemet — måste läggas in manuellt" },
+    ],
+    expected: [
+      { titleKeywords: ["klarna", "betalning"], mustInclude: ["c1", "c2", "c3"], mustExclude: ["c4", "c5"], expectedType: "RECURRING" },
+      { titleKeywords: ["order"], mustInclude: ["c4", "c5", "c6"], mustExclude: ["c1", "c2"], expectedType: "RECURRING" },
+    ],
+    expectedPatternCount: { min: 2, max: 3 },
+  },
 ];
 
 // ── Build the same prompt as local-detect-patterns.ts ──────────────────
@@ -156,7 +261,7 @@ Returnera JSON-array (inga kommentarer i JSON):
 }]`;
 }
 
-// ── Call local LLM ────────────────────────────────────────────────────
+// ── Call LLM (supports llama.cpp and Ollama) ─────────────────────────
 
 type DetectedPattern = {
   title: string;
@@ -166,21 +271,52 @@ type DetectedPattern = {
   suggestion: string;
 };
 
-async function callLLM(prompt: string): Promise<{ patterns: DetectedPattern[]; raw: string; durationMs: number; parseError?: string }> {
+type LLMBackend = {
+  name: string;
+  url: string;
+  model?: string; // required for Ollama
+};
+
+const BACKENDS: LLMBackend[] = [
+  { name: "Ministral 14B (llama.cpp)", url: LOCAL_URL },
+  { name: "Qwen 3.5 9B (Ollama)", url: "http://localhost:11434", model: "qwen3.5:9b" },
+];
+
+async function callLLM(prompt: string, backend: LLMBackend): Promise<{ patterns: DetectedPattern[]; raw: string; durationMs: number; parseError?: string }> {
   const start = Date.now();
-  const res = await fetch(`${LOCAL_URL}/v1/chat/completions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      messages: [{ role: "user", content: prompt }],
-      max_tokens: 3000,
-      temperature: 0.3,
-      stream: false,
-    }),
-  });
-  const data = await res.json();
+
+  let raw = "";
+  if (backend.model) {
+    // Ollama API
+    const res = await fetch(`${backend.url}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: backend.model,
+        messages: [{ role: "user", content: prompt }],
+        stream: false,
+        options: { temperature: 0.3, num_predict: 3000 },
+      }),
+    });
+    const data = await res.json();
+    raw = data.message?.content ?? "";
+  } else {
+    // llama.cpp OpenAI-compatible API
+    const res = await fetch(`${backend.url}/v1/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 3000,
+        temperature: 0.3,
+        stream: false,
+      }),
+    });
+    const data = await res.json();
+    raw = data.choices?.[0]?.message?.content ?? "";
+  }
+
   const durationMs = Date.now() - start;
-  const raw = data.choices?.[0]?.message?.content ?? "";
 
   try {
     const match = raw.match(/\[[\s\S]*\]/);
@@ -332,49 +468,105 @@ function scoreScenario(scenario: Scenario, detected: DetectedPattern[]): Scenari
 // ── Main ──────────────────────────────────────────────────────────────
 
 async function main() {
-  console.log("╔══════════════════════════════════════════════════════════════╗");
-  console.log("║  AI Pipeline Eval — Ministral Pattern Detection             ║");
-  console.log(`║  ${SCENARIOS.length} scenarier · ${new Date().toISOString().slice(0, 16)}                      ║`);
-  console.log("╚══════════════════════════════════════════════════════════════╝\n");
-
-  const results: ScenarioScore[] = [];
-
-  for (const scenario of SCENARIOS) {
-    process.stdout.write(`▸ ${scenario.name}... `);
-    const prompt = buildDetectPrompt(scenario.challenges, scenario.context);
-    const { patterns, durationMs, parseError } = await callLLM(prompt);
-
-    const score = scoreScenario(scenario, patterns);
-    score.durationMs = durationMs;
-    score.parseError = parseError;
-    results.push(score);
-
-    const emoji = score.total >= 0.8 ? "✓" : score.total >= 0.5 ? "~" : "✗";
-    console.log(`${emoji} ${(score.total * 100).toFixed(0)}% (${(durationMs / 1000).toFixed(1)}s, ${patterns.length} mönster)`);
+  // Check which backends are available
+  const available: LLMBackend[] = [];
+  for (const b of BACKENDS) {
+    try {
+      const url = b.model ? `${b.url}/api/tags` : `${b.url}/health`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(2000) });
+      if (res.ok) available.push(b);
+      else console.log(`⚠ ${b.name}: ej tillgänglig`);
+    } catch { console.log(`⚠ ${b.name}: ej tillgänglig`); }
   }
 
-  // Summary
-  console.log("\n" + "═".repeat(62));
-  console.log("RESULTAT PER SCENARIO");
-  console.log("═".repeat(62));
+  if (available.length === 0) { console.log("Inga backends tillgängliga!"); return; }
 
-  for (const r of results) {
-    console.log(`\n▸ ${r.name} — ${(r.total * 100).toFixed(0)}% (${r.patternCount} mönster, ${(r.durationMs / 1000).toFixed(1)}s)`);
-    if (r.parseError) console.log(`  ⚠ Parse-fel: ${r.parseError}`);
-    console.log(`  Antal=${(r.countScore*100).toFixed(0)} Täckning=${(r.coverageScore*100).toFixed(0)} Precision=${(r.precisionScore*100).toFixed(0)} Stuffing=${(r.noStuffingScore*100).toFixed(0)} Typer=${(r.validTypeScore*100).toFixed(0)} Dubbletter=${(r.noDuplicateScore*100).toFixed(0)}`);
-    for (const d of r.details.filter((d) => d.startsWith("  "))) {
-      console.log(d);
+  console.log("╔══════════════════════════════════════════════════════════════╗");
+  console.log("║  AI Pipeline Eval — Model Comparison                        ║");
+  console.log(`║  ${SCENARIOS.length} scenarier · ${available.length} modeller · ${new Date().toISOString().slice(0, 16)}        ║`);
+  console.log("╚══════════════════════════════════════════════════════════════╝\n");
+
+  const allResults: Record<string, ScenarioScore[]> = {};
+
+  for (const backend of available) {
+    console.log(`\n▶ ${backend.name}`);
+    console.log("─".repeat(62));
+    allResults[backend.name] = [];
+
+    for (const scenario of SCENARIOS) {
+      process.stdout.write(`  ${scenario.name}... `);
+      const prompt = buildDetectPrompt(scenario.challenges, scenario.context);
+      const { patterns, durationMs, parseError } = await callLLM(prompt, backend);
+
+      const score = scoreScenario(scenario, patterns);
+      score.durationMs = durationMs;
+      score.parseError = parseError;
+      allResults[backend.name].push(score);
+
+      const emoji = score.total >= 0.8 ? "✓" : score.total >= 0.5 ? "~" : "✗";
+      console.log(`${emoji} ${(score.total * 100).toFixed(0)}% (${(durationMs / 1000).toFixed(1)}s, ${patterns.length} mönster)`);
     }
   }
 
-  const avg = results.reduce((sum, r) => sum + r.total, 0) / results.length;
+  // Comparison table
   console.log("\n" + "═".repeat(62));
-  console.log(`TOTALPOÄNG: ${(avg * 100).toFixed(0)}%`);
+  console.log("JÄMFÖRELSE");
   console.log("═".repeat(62));
 
-  // Save results
+  // Header
+  const modelNames = Object.keys(allResults);
+  console.log(`\n${"Scenario".padEnd(40)} ${modelNames.map((n) => n.slice(0, 18).padStart(18)).join(" ")}`);
+  console.log("─".repeat(40 + modelNames.length * 19));
+
+  for (let i = 0; i < SCENARIOS.length; i++) {
+    const name = SCENARIOS[i].name.slice(0, 38).padEnd(40);
+    const scores = modelNames.map((m) => {
+      const s = allResults[m][i];
+      return `${(s.total * 100).toFixed(0)}% (${(s.durationMs / 1000).toFixed(0)}s)`.padStart(18);
+    }).join(" ");
+    console.log(`${name}${scores}`);
+  }
+
+  console.log("─".repeat(40 + modelNames.length * 19));
+  const avgs = modelNames.map((m) => {
+    const avg = allResults[m].reduce((sum, r) => sum + r.total, 0) / allResults[m].length;
+    const totalTime = allResults[m].reduce((sum, r) => sum + r.durationMs, 0);
+    return `${(avg * 100).toFixed(0)}% (${(totalTime / 1000).toFixed(0)}s)`.padStart(18);
+  }).join(" ");
+  console.log(`${"TOTALT".padEnd(40)}${avgs}`);
+
+  // Per-metric comparison
+  console.log("\n" + "═".repeat(62));
+  console.log("PER METRIC (medel)");
+  console.log("═".repeat(62));
+  const metrics = ["countScore", "coverageScore", "precisionScore", "noStuffingScore", "validTypeScore", "noDuplicateScore"] as const;
+  const metricLabels: Record<string, string> = { countScore: "Antal", coverageScore: "Täckning", precisionScore: "Precision", noStuffingScore: "Stuffing", validTypeScore: "Typer", noDuplicateScore: "Dubbletter" };
+
+  console.log(`${"Metric".padEnd(20)} ${modelNames.map((n) => n.slice(0, 18).padStart(18)).join(" ")}`);
+  for (const m of metrics) {
+    const vals = modelNames.map((name) => {
+      const avg = allResults[name].reduce((sum, r) => sum + r[m], 0) / allResults[name].length;
+      return `${(avg * 100).toFixed(0)}%`.padStart(18);
+    }).join(" ");
+    console.log(`${(metricLabels[m] || m).padEnd(20)}${vals}`);
+  }
+
+  // Detailed failures per model
+  for (const modelName of modelNames) {
+    const failures = allResults[modelName].filter((r) => r.details.some((d) => d.startsWith("  ")));
+    if (failures.length > 0) {
+      console.log(`\n▸ ${modelName} — problem:`);
+      for (const r of failures) {
+        for (const d of r.details.filter((d) => d.startsWith("  "))) {
+          console.log(`  [${r.name.slice(0, 25)}] ${d.trim()}`);
+        }
+      }
+    }
+  }
+
+  // Save
   const outPath = "/Users/evil/Desktop/EVIL/PROJEKT/worktemp/eval-pipeline-results.json";
-  writeFileSync(outPath, JSON.stringify({ timestamp: new Date().toISOString(), averageScore: avg, scenarios: results }, null, 2));
+  writeFileSync(outPath, JSON.stringify({ timestamp: new Date().toISOString(), models: allResults }, null, 2));
   console.log(`\nSparad: ${outPath}`);
 }
 
