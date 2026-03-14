@@ -1,6 +1,8 @@
 // Local LLM client via llama.cpp server (OpenAI-compatible API)
 
-const LOCAL_BASE_URL = process.env.LOCAL_LLM_URL || "http://127.0.0.1:8080";
+function getBaseUrl() {
+  return process.env.LOCAL_LLM_URL || "http://127.0.0.1:8080";
+}
 
 type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
 
@@ -12,7 +14,7 @@ export async function localChat(
   messages: ChatMessage[],
   maxTokens = 2000
 ): Promise<string> {
-  const res = await fetch(`${LOCAL_BASE_URL}/v1/chat/completions`, {
+  const res = await fetch(`${getBaseUrl()}/v1/chat/completions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -35,7 +37,7 @@ export async function localChat(
 // Health check — is the local server running?
 export async function isLocalLLMAvailable(): Promise<boolean> {
   try {
-    const res = await fetch(`${LOCAL_BASE_URL}/health`, {
+    const res = await fetch(`${getBaseUrl()}/health`, {
       signal: AbortSignal.timeout(2000),
     });
     return res.ok;

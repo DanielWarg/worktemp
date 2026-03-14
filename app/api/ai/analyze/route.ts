@@ -7,6 +7,7 @@ import { generateSuggestions } from "@/lib/ai/suggest";
 import { normalizeChallengesLocal } from "@/lib/ai/local-normalize";
 import { autoTagChallengesLocal } from "@/lib/ai/local-auto-tag";
 import { detectPatternsAILocal } from "@/lib/ai/local-detect-patterns";
+import { detectPatternsV2 } from "@/lib/ai/local-detect-patterns-v2";
 import { generateSuggestionsLocal } from "@/lib/ai/local-suggest";
 import { refinePatternsLocal } from "@/lib/ai/local-refine";
 
@@ -15,7 +16,7 @@ import { refinePatternsLocal } from "@/lib/ai/local-refine";
 // systemContext: optional override — falls back to workspace.systemContext
 export async function POST(request: Request) {
   const body = await request.json();
-  const { workspaceId, steps, provider = "anthropic", systemContext } = body;
+  const { workspaceId, steps, provider = "anthropic", systemContext, pipelineVersion } = body;
 
   if (!workspaceId) {
     return NextResponse.json({ error: "workspaceId is required" }, { status: 400 });
@@ -39,7 +40,7 @@ export async function POST(request: Request) {
   const STEP_LABELS: Record<string, string> = {
     normalize: "Normalisering",
     tag: "Auto-taggning",
-    patterns: "Mönsterdetektion",
+    patterns: "Mönsterdetektion (med pre-clustering)",
     refine: "Mönsterförfining",
     suggestions: "Förslagsgenerering",
   };
@@ -62,11 +63,14 @@ export async function POST(request: Request) {
     }
 
     if (requestedSteps.includes("patterns")) {
-      const r = isLocal
-        ? await detectPatternsAILocal(workspaceId, ctx)
-        : await detectPatternsAI(workspaceId, ctx);
+      const useV2 = isLocal && pipelineVersion !== "v1";
+      const r = useV2
+        ? await detectPatternsV2(workspaceId, ctx)
+        : isLocal
+          ? await detectPatternsAILocal(workspaceId, ctx)
+          : await detectPatternsAI(workspaceId, ctx);
       results.patterns = r;
-      if (r.failedBatches) warnings.push(`${STEP_LABELS.patterns}: ${r.failedBatches} av ${r.batches} batchar misslyckades`);
+      if ("failedBatches" in r && r.failedBatches) warnings.push(`${STEP_LABELS.patterns}: ${r.failedBatches} av ${r.batches} batchar misslyckades`);
     }
 
     if (requestedSteps.includes("refine") && isLocal) {
