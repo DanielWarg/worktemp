@@ -8,6 +8,8 @@
 import * as XLSX from "xlsx";
 import { writeFileSync } from "fs";
 import { config } from "dotenv";
+import { embedChallenges, type ChallengeForEmbed } from "../lib/ai/embed-challenges";
+import { clusterChallenges } from "../lib/ai/cluster-challenges";
 
 config({ path: new URL("../.env.local", import.meta.url).pathname });
 config({ path: new URL("../.env", import.meta.url).pathname });
@@ -201,13 +203,36 @@ function analyzeResults(allPatterns: DetectedPattern[], totalTickets: number, va
 async function main() {
   console.log("╔══════════════════════════════════════════════════════════════╗");
   console.log("║  Real Data Eval — HPTS Skapade ärenden (265 st)             ║");
+  console.log("║  Läge: " + (process.argv.includes("--no-cluster") ? "kronologisk" : "semantisk clustering") + "                                     ║");
   console.log("╚══════════════════════════════════════════════════════════════╝\n");
 
   const tickets = loadTickets();
   console.log(`Laddat ${tickets.length} ärenden\n`);
 
-  const BATCH_SIZE = 50;
-  const batches = chunk(tickets, BATCH_SIZE);
+  const useClustering = !process.argv.includes("--no-cluster");
+
+  let batches: typeof tickets[];
+  if (useClustering) {
+    console.log("Pre-clustering med Transformers.js embeddings...");
+    const embedStart = Date.now();
+    const forEmbed: ChallengeForEmbed[] = tickets.map((t) => ({
+      id: t.id,
+      text: t.text,
+      tags: t.tags,
+      person: t.person,
+    }));
+    const embeddings = await embedChallenges(forEmbed);
+    const embedMs = Date.now() - embedStart;
+    console.log(`Embedding: ${tickets.length} ärenden → ${embeddings.size} vektorer (${(embedMs / 1000).toFixed(1)}s)`);
+
+    batches = clusterChallenges(tickets, embeddings);
+    console.log(`Klustring: ${batches.length} semantiska kluster [${batches.map((b) => b.length).join(", ")}]\n`);
+  } else {
+    const BATCH_SIZE = 50;
+    batches = chunk(tickets, BATCH_SIZE);
+    console.log(`Kronologiska batchar: ${batches.length} × ${50}\n`);
+  }
+
   const allPatterns: DetectedPattern[] = [];
   const validIds = new Set(tickets.map((t) => t.id));
   let totalDuration = 0;
@@ -411,6 +436,8 @@ Var konservativ — behåll hellre för många än för få. Slå bara ihop vid 
     invalidTypes,
     parseErrors,
     totalDurationS: Math.round(totalDuration / 1000),
+    clusterMethod: useClustering ? "semantic" : "chronological",
+    clusters: batches.length,
   };
 
   console.log("\n" + "═".repeat(62));
@@ -419,11 +446,13 @@ Var konservativ — behåll hellre för många än för få. Slå bara ihop vid 
   console.log(JSON.stringify(score, null, 2));
 
   // Save
+  const suffix = useClustering ? "semantic" : "chronological";
+  const outPath = `/Users/evil/Desktop/EVIL/PROJEKT/worktemp/eval-real-data-${suffix}.json`;
   writeFileSync(
-    "/Users/evil/Desktop/EVIL/PROJEKT/worktemp/eval-real-data.json",
+    outPath,
     JSON.stringify({ timestamp: new Date().toISOString(), score, patterns: allPatterns }, null, 2)
   );
-  console.log("\nSparad: eval-real-data.json");
+  console.log(`\nSparad: eval-real-data-${suffix}.json`);
 }
 
 main().catch(console.error);
