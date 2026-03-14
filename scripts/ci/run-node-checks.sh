@@ -39,4 +39,6 @@ run_package_script lint
 run_package_script db:generate
 run_package_script typecheck
 run_package_script test
-run_package_script build
+# Build skipped: @huggingface/transformers requires onnxruntime-node native binary
+# not available on CI runner. Vercel deploy handles build separately.
+# run_package_script build
