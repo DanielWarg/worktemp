@@ -64,7 +64,8 @@ export async function POST(request: Request) {
     }
 
     if (requestedSteps.includes("patterns")) {
-      const r = pipelineVersion === "v3"
+      const useV3 = pipelineVersion === "v3" || (isLocal && pipelineVersion !== "v1" && pipelineVersion !== "v2");
+      const r = useV3
         ? await detectPatternsV3(workspaceId)
         : pipelineVersion === "v1"
           ? isLocal

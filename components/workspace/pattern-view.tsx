@@ -103,7 +103,12 @@ export function PatternView({ workspaceId, initialSystemContext, onBack }: Patte
     { key: "suggestions", label: "Genererar förslag" },
   ];
 
+  const AI_STEPS_V3 = [
+    { key: "patterns", label: "Analyserar mönster (v3 — embedding + entity)" },
+  ];
+
   async function handleAIAnalysis() {
+    const steps = aiProvider === "local" ? AI_STEPS_V3 : AI_STEPS;
     setAiRunning(true);
     setAiStep(0);
     setAiStepResult(null);
@@ -111,34 +116,38 @@ export function PatternView({ workspaceId, initialSystemContext, onBack }: Patte
     setAiError(null);
     const collectedWarnings: string[] = [];
 
-    for (let i = 0; i < AI_STEPS.length; i++) {
+    for (let i = 0; i < steps.length; i++) {
       setAiStep(i + 1);
       setAiStepResult(null);
       try {
-        const result = await api<Record<string, { processed?: number; detected?: number; generated?: number; batches?: number; failedBatches?: number }> & { warnings?: string[]; error?: string }>(
+        const result = await api<Record<string, { processed?: number; detected?: number; generated?: number; batches?: number; failedBatches?: number; patterns?: number; coverage?: number; elapsed?: number }> & { warnings?: string[]; error?: string }>(
           "/api/ai/analyze",
           {
             method: "POST",
-            body: JSON.stringify({ workspaceId, steps: [AI_STEPS[i].key], provider: aiProvider }),
+            body: JSON.stringify({ workspaceId, steps: [steps[i].key], provider: aiProvider }),
           }
         );
 
         if (result.error) {
-          setAiError(`${AI_STEPS[i].label}: ${result.error}`);
+          setAiError(`${steps[i].label}: ${result.error}`);
           break;
         }
 
         if (result.warnings) collectedWarnings.push(...result.warnings);
 
-        const stepData = result[AI_STEPS[i].key];
+        const stepData = result[steps[i].key] as Record<string, unknown> | undefined;
         if (stepData) {
-          const count = stepData.processed ?? stepData.detected ?? stepData.generated ?? 0;
-          const batchInfo = stepData.batches && stepData.batches > 1 ? ` (${stepData.batches} batchar)` : "";
+          const count = (stepData.detected ?? stepData.processed ?? stepData.generated ?? 0) as number;
+          const coverage = stepData.coverage as number | undefined;
+          const elapsed = stepData.elapsed as number | undefined;
+          const batchInfo = stepData.batches && (stepData.batches as number) > 1 ? ` (${stepData.batches} batchar)` : "";
           const failInfo = stepData.failedBatches ? ` — ${stepData.failedBatches} misslyckade` : "";
-          setAiStepResult(`${count} st${batchInfo}${failInfo}`);
+          const coverageInfo = coverage != null ? ` — ${coverage}% täckning` : "";
+          const timeInfo = elapsed != null ? ` (${(elapsed / 1000).toFixed(1)}s)` : "";
+          setAiStepResult(`${count} mönster${batchInfo}${failInfo}${coverageInfo}${timeInfo}`);
         }
       } catch {
-        setAiError(`${AI_STEPS[i].label}: Nätverksfel eller servern svarar inte`);
+        setAiError(`${steps[i].label}: Nätverksfel eller servern svarar inte`);
         break;
       }
     }
