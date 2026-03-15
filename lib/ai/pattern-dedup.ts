@@ -59,6 +59,10 @@ export function deduplicatePatterns<T extends {
     const rj = root(j);
     if (ri === rj) continue; // Already merged
 
+    // Re-check actual sizes after previous merges
+    const actualMergedSize = patterns[ri].ticketIds.length + patterns[rj].ticketIds.length;
+    if (actualMergedSize > 15) continue;
+
     // Merge smaller into larger
     const [larger, smaller] = patterns[ri].ticketIds.length >= patterns[rj].ticketIds.length
       ? [ri, rj] : [rj, ri];
