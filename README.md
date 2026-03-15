@@ -1,18 +1,17 @@
-<h1 align="center">
-  <br>
-  MÖNSTER
-  <br>
-</h1>
+```
+
+  ███╗   ███╗ ██████╗ ███╗   ██╗███████╗████████╗███████╗██████╗
+  ████╗ ████║██╔═══██╗████╗  ██║██╔════╝╚══██╔══╝██╔════╝██╔══██╗
+  ██╔████╔██║██║   ██║██╔██╗ ██║███████╗   ██║   █████╗  ██████╔╝
+  ██║╚██╔╝██║██║   ██║██║╚██╗██║╚════██║   ██║   ██╔══╝  ██╔══██╗
+  ██║ ╚═╝ ██║╚██████╔╝██║ ╚████║███████║   ██║   ███████╗██║  ██║
+  ╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚══════╝╚═╝  ╚═╝
+
+```
 
 <p align="center">
-  <strong>See the patterns your team misses.</strong>
-</p>
-
-<p align="center">
-  <em>Local-first AI pattern detection. Your data never leaves your machine.</em>
-</p>
-
-<p align="center">
+  <strong>See the patterns your team misses.</strong><br>
+  <em>Local-first AI · Your data never leaves your machine</em><br><br>
   <code>capture → analyze → prioritize → act</code>
 </p>
 
