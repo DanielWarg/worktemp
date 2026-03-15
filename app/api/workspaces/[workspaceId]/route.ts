@@ -21,10 +21,7 @@ export async function GET(
                 include: {
                   notes: { orderBy: { createdAt: "desc" } },
                   attachments: { orderBy: { createdAt: "desc" } },
-                  challenges: {
-                    orderBy: { createdAt: "desc" },
-                    include: { tags: { include: { tag: true } } },
-                  },
+                  _count: { select: { challenges: true } },
                 },
               },
             },

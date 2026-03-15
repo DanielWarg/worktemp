@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { PersonData, TeamData, ChallengeData, TagData } from "./types";
 import { initialsFromName, formatDate, formatFileSize, api } from "./helpers";
 import { TagInput } from "./tag-input";
@@ -36,9 +36,25 @@ export function PersonDetailPanel({
 }: PersonDetailPanelProps) {
   const [draftNote, setDraftNote] = useState("");
   const [activeTab, setActiveTab] = useState<PanelTab>("profil");
+  const [challenges, setChallenges] = useState<ChallengeData[]>([]);
+  const [challengesLoaded, setChallengesLoaded] = useState(false);
 
-  const openChallenges = person.challenges?.filter((c) => c.status === "OPEN") ?? [];
-  const resolvedChallenges = person.challenges?.filter((c) => c.status !== "OPEN") ?? [];
+  const loadChallenges = useCallback(async () => {
+    const data = await api<ChallengeData[]>(`/api/persons/${person.id}/challenges`);
+    setChallenges(data);
+    setChallengesLoaded(true);
+  }, [person.id]);
+
+  // Load challenges on demand when user clicks the tab
+  // Parent renders with key={person.id} to reset state on person change
+
+  const openChallenges = challenges.filter((c) => c.status === "OPEN");
+  const resolvedChallenges = challenges.filter((c) => c.status !== "OPEN");
+
+  // Challenge count for badge (use _count from workspace query, or loaded challenges)
+  const challengeCountBadge = challengesLoaded
+    ? openChallenges.length
+    : (person._count?.challenges ?? 0);
 
   async function handleAddNote() {
     const content = draftNote.trim();
@@ -57,7 +73,7 @@ export function PersonDetailPanel({
         sourceType: "BETWEEN_MEETINGS",
       }),
     });
-    await onReload();
+    await loadChallenges();
   }
 
   async function handleUpdateChallengeStatus(challengeId: string, status: string) {
@@ -65,7 +81,11 @@ export function PersonDetailPanel({
       method: "PATCH",
       body: JSON.stringify({ status }),
     });
-    await onReload();
+    await loadChallenges();
+  }
+
+  async function handleChallengeReload() {
+    await loadChallenges();
   }
 
   return (
@@ -145,13 +165,13 @@ export function PersonDetailPanel({
               ? "border-b-2 border-[var(--color-mint-400)] text-[var(--color-green-950)]"
               : "text-[var(--color-stone-700)] hover:text-[var(--color-green-900)]"
           }`}
-          onClick={() => setActiveTab("utmaningar")}
+          onClick={() => { setActiveTab("utmaningar"); if (!challengesLoaded) loadChallenges(); }}
           type="button"
         >
           Utmaningar
-          {openChallenges.length > 0 && (
+          {challengeCountBadge > 0 && (
             <span className="ml-2 rounded-full bg-[var(--color-copper-500)]/15 px-2 py-0.5 text-[10px] text-[var(--color-copper-500)]">
-              {openChallenges.length}
+              {challengeCountBadge}
             </span>
           )}
         </button>
@@ -295,7 +315,7 @@ export function PersonDetailPanel({
                       workspaceId={workspaceId}
                       allTags={allTags}
                       onUpdateStatus={handleUpdateChallengeStatus}
-                      onReload={onReload}
+                      onReload={handleChallengeReload}
                     />
                   ))}
                 </div>
@@ -315,7 +335,7 @@ export function PersonDetailPanel({
                       workspaceId={workspaceId}
                       allTags={allTags}
                       onUpdateStatus={handleUpdateChallengeStatus}
-                      onReload={onReload}
+                      onReload={handleChallengeReload}
                     />
                   ))}
                 </div>
