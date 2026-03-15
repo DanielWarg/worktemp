@@ -428,9 +428,10 @@ async function buildChatFn(model: string): Promise<(msgs: ChatMessage[], maxToke
     };
   }
 
-  if (model === "qwen2.5-3b") {
+  if (model.startsWith("qwen2.5-")) {
     const { ollamaChat } = await import("../lib/ai/ollama-client");
-    return (msgs, maxTokens) => ollamaChat(msgs, maxTokens, "qwen2.5:3b");
+    const tag = model.replace("-", ":");
+    return (msgs, maxTokens) => ollamaChat(msgs, maxTokens, tag);
   }
 
   if (model === "gpt-oss") {

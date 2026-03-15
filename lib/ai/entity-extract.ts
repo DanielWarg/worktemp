@@ -44,6 +44,10 @@ const STOP_WORDS = new Set([
   "akut", "prio", "hög", "låg", "info", "information",
   // Generic words that look like proper nouns but aren't
   "okänd", "test", "prod", "dev", "staging", "server",
+  // Priority/status labels (common in ticket systems)
+  "normal", "hög", "låg", "kritisk", "brådskande", "urgent",
+  "high", "medium", "low", "critical",
+  "öppen", "stängd", "löst", "closed", "open", "resolved",
 ]);
 
 export type ExtractedEntities = {
@@ -73,10 +77,12 @@ export function extractEntities(text: string): ExtractedEntities {
 /**
  * Extract entities FROM tag text (not raw tags as entities).
  * Tags like "4 PubTrans 5 TIMS" → extract "PubTrans", "TIMS".
+ * Filters out priority/status tags like "3. Normal", "2. Hög".
  */
 export function extractEntitiesFromTags(tags: string[]): ExtractedEntities {
-  const combined = tags.join(" ");
-  // Extract proper nouns from tag text — same heuristics as free text
+  // Filter out priority/status tags before extraction
+  const filtered = tags.filter((t) => !/^\d+\.\s*(Normal|Hög|Låg|Kritisk|Medium|High|Low)/i.test(t));
+  const combined = filtered.join(" ");
   const systems = extractProperNouns(combined);
   return { systems, actions: [], signature: systems.sort().join("|") || "UNKNOWN" };
 }
