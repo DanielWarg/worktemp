@@ -47,7 +47,14 @@ generated/prisma/
 .context/cache/
 .context/plan/
 .context/hooks/
+.context/watch/
 .npm-cache/
 mcp/.npm-cache/
 mcp/dist/
 mcp/node_modules/
+
+# Claude Code
+.claude/
+
+# Eval results (generated locally)
+eval-*.json

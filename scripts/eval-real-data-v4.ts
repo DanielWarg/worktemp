@@ -1,5 +1,5 @@
 /**
- * Eval on real HPTS data — v4 pipeline with threshold sweep + purity metrics.
+ * Eval on real data — v4 pipeline with threshold sweep + purity metrics.
  *
  * Usage:
  *   npx tsx scripts/eval-real-data-v4.ts                     # Full v4 run (deterministic)

@@ -1,5 +1,5 @@
 /**
- * Eval on real HPTS data — deterministic pipeline v3 + optional title polish.
+ * Eval on real data — deterministic pipeline v3 + optional title polish.
  *
  * Usage:
  *   npx tsx scripts/eval-real-data-v3.ts                    # No LLM (deterministic only)
@@ -17,7 +17,7 @@ import { classifyTicket, findDuplicates, type TicketClass } from "../lib/ai/pre-
 import { extractEntities, extractEntitiesFromTags, mergeEntities, discoverCorpusEntities, type ExtractedEntities } from "../lib/ai/entity-extract";
 import { subSplitCluster, type TicketWithEntities } from "../lib/ai/sub-split";
 import { calcTrend, calcScope, calcConfidence, type TrendType, type ScopeType, type ConfidenceLevel } from "../lib/ai/trend-calc";
-import { polishTitles, polishTitlesSequential, type PatternForPolish } from "../lib/ai/title-polish";
+import { polishTitles, polishTitlesSequential, polishWithSuggestions, type PatternForPolish } from "../lib/ai/title-polish";
 
 config({ path: new URL("../.env.local", import.meta.url).pathname });
 config({ path: new URL("../.env", import.meta.url).pathname });
@@ -259,11 +259,16 @@ async function main() {
     console.log(`\nStep 6: Title polish via ${POLISH_MODEL}...`);
 
     const chatFn = await buildChatFn(POLISH_MODEL);
+    // Build lookup for ticket texts
+    const ticketTextsMap = new Map<string, string>();
+    for (const t of coreTickets) ticketTextsMap.set(t.id, t.text);
+
     const forPolish: PatternForPolish[] = patterns.map((p) => ({
       title: p.title,
       entities: p.entities,
       ticketCount: p.ticketIds.length,
       evidence: p.evidence,
+      allTicketTexts: p.ticketIds.map((id) => ticketTextsMap.get(id) || "").filter(Boolean),
     }));
 
     // Use batch (JSON) for Claude, sequential (plaintext) for local models

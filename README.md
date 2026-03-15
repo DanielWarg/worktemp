@@ -1,6 +1,6 @@
 # Team Problem Radar
 
-Captures challenges during team meetings, detects patterns with AI, and correlates with CRM data. Built for Swedish public transport (HPTS/Hogia) but generalizable.
+Captures challenges during team meetings, detects patterns with AI, and correlates with CRM data. Domain-agnostic — works for support tickets, HR, phone statistics, meeting notes, or any structured complaint data.
 
 ## Stack
 
@@ -8,33 +8,29 @@ Next.js 16 (App Router) · React 19 · TypeScript · Prisma 7 · PostgreSQL (Neo
 
 ## AI Pipeline
 
-4-step analysis: **normalize** → **auto-tag** → **detect-patterns** → **suggest**
-
 Two providers:
-- **Cloud:** Claude Sonnet 4 via Anthropic API
-- **Local:** Ministral 14B via llama.cpp (offline-first, port 8081)
+- **Local (default):** v4 pipeline — 95% deterministic, fully offline. Optional title polish via Qwen2.5-7B on Ollama.
+- **Cloud:** Claude Sonnet 4 via Anthropic API (requires explicit opt-in due to data privacy).
 
-### Semantic Clustering
+### v4 Pipeline Flow
 
-Pattern detection uses Transformers.js embeddings (`all-MiniLM-L6-v2`) to group challenges by similarity before sending to the LLM. This replaces naive chronological batching and produces significantly better results:
+```
+Filter → Embed → Cluster → Topic Extract → Dedup → Metadata → Title Polish
+```
 
-| | Semantic | Chronological |
-|--|----------|---------------|
-| Coverage | 73% | 58% |
-| Patterns | 46 | 24 |
-| Duplicates | 0 | 2 |
-| Max pattern size | 16 | 48 (catch-all) |
+1. **Filter** — pre-classify tickets + deduplicate
+2. **Embed** — multilingual sentence embeddings (paraphrase-multilingual-MiniLM-L12-v2, 384-dim)
+3. **Cluster** — agglomerative clustering with hard max cap (12 tickets)
+4. **Topic Extract** — n-gram TF-IDF, domain-agnostic (replaces entity extraction)
+5. **Pattern Dedup** — dual signal: centroid similarity + topic Jaccard overlap
+6. **Metadata** — org-based scope, trend from dates, confidence scoring
+7. **Title Polish** — optional LLM call via Ollama (Qwen2.5-7B)
 
-Clustering parameters (in `lib/ai/cluster-challenges.ts`):
-- `TARGET_MIN=20`, `TARGET_MAX=40` — cluster size range
-- `SIMILARITY_THRESHOLD=0.30` — cosine similarity cutoff
-- `MIN_CLUSTER=5` — minimum viable cluster
-
-A refine step (AI self-critique + code-based dedup) runs after detection to merge overlapping patterns.
+Performance: ~2s deterministic, ~50s with title polish (M4 Pro, 265 tickets → 35 patterns).
 
 ### Cortex MCP
 
-Local knowledge graph (`mcp/`) indexes the codebase and provides semantic search, graph-weighted ranking, and context for AI analysis.
+Local knowledge graph (`mcp/`) indexes the codebase and provides semantic search and context for AI analysis.
 
 ## Getting Started
 
@@ -59,12 +55,14 @@ Open `http://localhost:3000/workspace` for the app.
 ### Local AI (optional)
 
 ```bash
-# Start Ministral 14B
-llama-server -m ~/.cache/models/Ministral-3-14B-Instruct-2512-Q4_K_M.gguf --port 8081 -ngl 99
+# Start Ollama with Qwen2.5-7B for title polish
+ollama run qwen2.5:7b
 
 # Run eval
-npx tsx scripts/eval-real-data.ts              # Semantic clustering
-npx tsx scripts/eval-real-data.ts --no-cluster  # Chronological baseline
+npx tsx scripts/eval-real-data-v4.ts              # Deterministic only
+npx tsx scripts/eval-real-data-v4.ts --sweep       # Threshold sweep
+npx tsx scripts/eval-real-data-v4.ts --polish qwen2.5-7b  # With title polish
+npx tsx scripts/stress-test-v4.ts                  # Stress test (HR, phone, IT, mixed)
 ```
 
 ## Project Structure
@@ -72,15 +70,20 @@ npx tsx scripts/eval-real-data.ts --no-cluster  # Chronological baseline
 ```
 app/                    Pages and ~32 REST API routes
 components/workspace/   UI components (workspace-shell.tsx is main container)
-lib/ai/                 AI pipeline (cloud + local variants)
-  cluster-challenges.ts Agglomerative semantic clustering
-  embed-challenges.ts   Transformers.js embeddings (384-dim)
-  detect-patterns.ts    Claude pattern detection
-  local-*.ts            Ministral/local variants
+lib/ai/                 AI pipeline
+  pattern-detect-v4.ts  v4 orchestrator (default)
+  pattern-detect-v3.ts  v3 orchestrator (fallback)
+  embed-challenges.ts   Multilingual sentence embeddings
+  cluster-challenges.ts Agglomerative clustering
+  topic-extract.ts      N-gram TF-IDF topic extraction
+  pattern-dedup.ts      Dual-signal pattern deduplication
+  trend-calc.ts         Trend, scope, confidence scoring
+  title-polish.ts       LLM title polish (Ollama)
+  pre-classify.ts       Ticket classification + noise filter
 lib/crm/                Freshdesk/Zendesk/HubSpot adapters
 lib/db/                 Prisma singleton (@prisma/adapter-pg)
 mcp/                    Cortex MCP server (knowledge graph)
-scripts/                Eval pipeline, ingestion, context tools
+scripts/                Eval and stress test scripts
 generated/prisma/       Auto-generated Prisma client
 ```
 
@@ -89,14 +92,6 @@ generated/prisma/       Auto-generated Prisma client
 `Workspace` → `Team` → `Person` → `Challenge` → `Tag` (via `ChallengeTag`)
 
 `Pattern` links to challenges via `PatternChallenge`. `Suggestion` is AI-generated advice per pattern. `HistoricalImport` tracks imported batches.
-
-## Routes
-
-- `/` — Landing page
-- `/workspace` — Main app (canvas, meeting, patterns, CRM, history views)
-- `/api/ai/analyze` — AI pipeline endpoint
-- `/api/health` — Health check
-- `~32 REST API routes` for workspaces, teams, persons, challenges, patterns, tags, CRM
 
 ## Conventions
 

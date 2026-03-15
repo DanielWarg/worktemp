@@ -8,9 +8,19 @@
  * This is the ONLY step that uses LLM, and it's optional.
  */
 
-import { sanitizeJson } from "./micro-steps/sanitize-json";
-
 type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
+
+/** Sanitize LLM output for JSON parsing — strip control chars inside string values */
+function sanitizeJson(raw: string): string {
+  return raw.replace(
+    /"(?:[^"\\]|\\.)*"/g,
+    (match) => match
+      .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, "")
+      .replace(/\t/g, " ")
+      .replace(/\n/g, " ")
+      .replace(/\r/g, "")
+  );
+}
 type ChatFn = (messages: ChatMessage[], maxTokens: number) => Promise<string>;
 
 export type PatternForPolish = {
