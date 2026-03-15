@@ -9,6 +9,7 @@ import { autoTagChallengesLocal } from "@/lib/ai/local-auto-tag";
 import { detectPatternsAILocal } from "@/lib/ai/local-detect-patterns";
 import { detectPatternsV2 } from "@/lib/ai/local-detect-patterns-v2";
 import { detectPatternsV3 } from "@/lib/ai/pattern-detect-v3";
+import { detectPatternsV4 } from "@/lib/ai/pattern-detect-v4";
 import { generateSuggestionsLocal } from "@/lib/ai/local-suggest";
 import { refinePatternsLocal } from "@/lib/ai/local-refine";
 
@@ -64,16 +65,19 @@ export async function POST(request: Request) {
     }
 
     if (requestedSteps.includes("patterns")) {
-      const useV3 = pipelineVersion === "v3" || (isLocal && pipelineVersion !== "v1" && pipelineVersion !== "v2");
-      const r = useV3
-        ? await detectPatternsV3(workspaceId)
-        : pipelineVersion === "v1"
-          ? isLocal
-            ? await detectPatternsAILocal(workspaceId, ctx)
-            : await detectPatternsAI(workspaceId, ctx)
-          : isLocal
-            ? await detectPatternsV2(workspaceId, ctx)
-            : await detectPatternsAI(workspaceId, ctx);
+      const useV4 = isLocal && pipelineVersion !== "v1" && pipelineVersion !== "v2" && pipelineVersion !== "v3";
+      const useV3 = pipelineVersion === "v3";
+      const r = useV4
+        ? await detectPatternsV4(workspaceId)
+        : useV3
+          ? await detectPatternsV3(workspaceId)
+          : pipelineVersion === "v1"
+            ? isLocal
+              ? await detectPatternsAILocal(workspaceId, ctx)
+              : await detectPatternsAI(workspaceId, ctx)
+            : isLocal
+              ? await detectPatternsV2(workspaceId, ctx)
+              : await detectPatternsAI(workspaceId, ctx);
       results.patterns = r;
       if ("failedBatches" in r && r.failedBatches) warnings.push(`${STEP_LABELS.patterns}: ${r.failedBatches} av ${r.batches} batchar misslyckades`);
     }

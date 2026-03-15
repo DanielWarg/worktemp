@@ -41,6 +41,21 @@ export function calcScope(uniquePersons: number): ScopeType {
   return "CROSS_TEAM";
 }
 
+/**
+ * Calculate scope from unique org count, falling back to person count.
+ */
+export function calcScopeByOrg(
+  uniqueOrgs: number,
+  uniquePersons: number,
+): ScopeType {
+  if (uniqueOrgs > 0) {
+    if (uniqueOrgs <= 1) return "SINGLE";
+    if (uniqueOrgs <= 3) return "CROSS_PERSON";
+    return "CROSS_TEAM";
+  }
+  return calcScope(uniquePersons);
+}
+
 export type ConfidenceLevel = "HIGH" | "MEDIUM" | "LOW";
 
 /**

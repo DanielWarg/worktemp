@@ -1,0 +1,1420 @@
+{
+  "timestamp": "2026-03-15T15:06:13.737Z",
+  "score": {
+    "pipeline": "v4",
+    "totalTickets": 265,
+    "noiseFiltered": 80,
+    "coreTickets": 185,
+    "patterns": 39,
+    "coverage": "100%",
+    "orphanRate": "0%",
+    "catchAll": 0,
+    "maxGroupSize": 11,
+    "dedupMerged": 0,
+    "totalDurationMs": 50280,
+    "polishModel": "qwen2.5-7b",
+    "llmCalls": 39,
+    "polishFallbacks": 0,
+    "clusters": 39,
+    "scope": {
+      "CROSS_TEAM": 8,
+      "CROSS_PERSON": 26,
+      "SINGLE": 5
+    },
+    "confidence": {
+      "HIGH": 16,
+      "MEDIUM": 23
+    }
+  },
+  "patterns": [
+    {
+      "title": "Trafikledningssystem visar fel på hemsidan",
+      "description": "8 ärenden. Ämnen: tjänst, trafikledningssystem, #ostgotatrafiken, hemsidan, fordon. Scope: CROSS_TEAM.",
+      "patternType": "CROSS_TEAM",
+      "scope": "CROSS_TEAM",
+      "trend": "ISOLATED",
+      "confidence": "HIGH",
+      "topics": [
+        "tjänst",
+        "trafikledningssystem",
+        "#ostgotatrafiken",
+        "hemsidan",
+        "fordon"
+      ],
+      "evidence": [
+        {
+          "text": "#ostgotatrafiken[1003]:136912#   Ang ärende: 136912 \"TIMS syns inte på hemsidan\"",
+          "person": "Aktiebolaget Östgötatrafiken"
+        },
+        {
+          "text": "VB: Sv: #ostgotatrafiken[1003]:137237#   Vi har tagit emot ditt ärende: Meddelande fastnat på Trafikläget på hemsidan",
+          "person": "Aktiebolaget Östgötatrafiken"
+        },
+        {
+          "text": "Hogia Tims Inloggning",
+          "person": "Svealandstrafiken AB"
+        }
+      ],
+      "ticketCount": 8,
+      "ticketIds": [
+        "t1",
+        "t5",
+        "t224",
+        "t226",
+        "t130",
+        "t222",
+        "t2",
+        "t81"
+      ]
+    },
+    {
+      "title": "Felanmälan om Nobinas CAD/AVL-system",
+      "description": "3 ärenden. Ämnen: felanmälning, sl-system, cad/avl, DaRT, cad/avl pubtrans. Scope: CROSS_PERSON.",
+      "patternType": "CROSS_PERSON",
+      "scope": "CROSS_PERSON",
+      "trend": "ISOLATED",
+      "confidence": "MEDIUM",
+      "topics": [
+        "felanmälning",
+        "sl-system",
+        "cad/avl",
+        "DaRT",
+        "cad/avl pubtrans"
+      ],
+      "evidence": [
+        {
+          "text": "RE: REQSETR02552487 Felanmälning från Nobina ang SL-system CAD/AVL",
+          "person": "Aktiebolaget Storstockholms Lokaltrafik"
+        },
+        {
+          "text": "FW: REQSETR02553605 Felanmälning från Nobina ang SL-system CAD/AVL",
+          "person": "Aktiebolaget Storstockholms Lokaltrafik"
+        },
+        {
+          "text": "Arriva/HOGIA-CL2069/RealtimeResend/Service",
+          "person": "VR Sverige AB"
+        }
+      ],
+      "ticketCount": 3,
+      "ticketIds": [
+        "t8",
+        "t11",
+        "t259"
+      ]
+    },
+    {
+      "title": "TIMS-systemets instabilitet",
+      "description": "5 ärenden. Ämnen: TIMS, PubTrans. Scope: CROSS_PERSON.",
+      "patternType": "CROSS_PERSON",
+      "scope": "CROSS_PERSON",
+      "trend": "ISOLATED",
+      "confidence": "HIGH",
+      "topics": [
+        "TIMS",
+        "PubTrans"
+      ],
+      "evidence": [
+        {
+          "text": "REQSETR02556394 - TIMS - Störningsinformation Slussen och Allmänagränd",
+          "person": "Aktiebolaget Storstockholms Lokaltrafik"
+        },
+        {
+          "text": "TIMS bug report",
+          "person": "Aktiebolaget Storstockholms Lokaltrafik"
+        },
+        {
+          "text": "Movia/PTVDARTAPP04/ROM/RDA_TIMS/UpdatesUpToInclDateTime RDA_TIMS",
+          "person": "Trafikselskabet Movia"
+        }
+      ],
+      "ticketCount": 5,
+      "ticketIds": [
+        "t9",
+        "t39",
+        "t239",
+        "t10",
+        "t251"
+      ]
+    },
+    {
+      "title": "TIMS-is-dip--tvb-problem",
+      "description": "11 ärenden. Ämnen: TIMS, PubTrans, is-dip--tvb, magneten, is-dip--sickla-tims. Scope: SINGLE.",
+      "patternType": "RECURRING",
+      "scope": "SINGLE",
+      "trend": "ISOLATED",
+      "confidence": "HIGH",
+      "topics": [
+        "TIMS",
+        "PubTrans",
+        "is-dip--tvb",
+        "magneten",
+        "is-dip--sickla-tims"
+      ],
+      "evidence": [
+        {
+          "text": "VB: [REF:REQSETR02554650] - IS-DIP-685865-Sickla-TIMS",
+          "person": "Aktiebolaget Storstockholms Lokaltrafik"
+        },
+        {
+          "text": "RE: REQSETR02565190 - IS-DIP-687819-Tattby-Erstaviksbadet-TIMS",
+          "person": "Aktiebolaget Storstockholms Lokaltrafik"
+        },
+        {
+          "text": "RE: REQSETR02553187 - IS-DIP-685527-Gullmarsplan-Signalställverk",
+          "person": "Aktiebolaget Storstockholms Lokaltrafik"
+        }
+      ],
+      "ticketCount": 11,
+      "ticketIds": [
+        "t12",
+        "t20",
+        "t27",
+        "t18",
+        "t31",
+        "t38",
+        "t36",
+        "t40",
+        "t28",
+        "t34",
+        "t35"
+      ]
+    },
+    {
+      "title": "Problemer med PWS-anslutning och import",
+      "description": "4 ärenden. Ämnen: PWS. Scope: CROSS_PERSON.",
+      "patternType": "CROSS_PERSON",
+      "scope": "CROSS_PERSON",
+      "trend": "ISOLATED",
+      "confidence": "MEDIUM",
+      "topics": [
+        "PWS"
+      ],
+      "evidence": [
+        {
+          "text": "FW: REQSETR02562216 - X15p Problem med anslutning",
+          "person": "Aktiebolaget Storstockholms Lokaltrafik"
+        },
+        {
+          "text": "FW: [REF:REQSETR02572065] - Felanmälan misslyckad import av nya stoppställen",
+          "person": "Aktiebolaget Storstockholms Lokaltrafik"
+        },
+        {
+          "text": "FW: #115149 Angående ärende #115000 - Kan ni kolla server",
+          "person": "Aktiebolaget Storstockholms Lokaltrafik"
+        }
+      ],
+      "ticketCount": 4,
+      "ticketIds": [
+        "t13",
+        "t24",
+        "t21",
+        "t60"
+      ]
+    },
+    {
+      "title": "PubTrans-systemet funkar inte",
+      "description": "3 ärenden. Ämnen: PubTrans, TIMS, DaRT, til. Scope: CROSS_PERSON.",
+      "patternType": "CROSS_PERSON",
+      "scope": "CROSS_PERSON",
+      "trend": "ISOLATED",
+      "confidence": "MEDIUM",
+      "topics": [
+        "PubTrans",
+        "TIMS",
+        "DaRT",
+        "til"
+      ],
+      "evidence": [
+        {
+          "text": "VB: Avstämning TF&Hogia",
+          "person": "Aktiebolaget Storstockholms Lokaltrafik"
+        },
+        {
+          "text": "VB: PUB-Trans ligger nere ",
+          "person": "Aktiebolaget Storstockholms Lokaltrafik"
+        },
+        {
+          "text": "Nye ruter som skal ekskluderes i eksport til Entur",
+          "person": "Møre og Romsdal Fylkeskommune"
+        }
+      ],
+      "ticketCount": 3,
+      "ticketIds": [
+        "t16",
+        "t37",
+        "t97"
+      ]
+    },
+    {
+      "title": "Diskutrymme problem",
+      "description": "3 ärenden. Ämnen: space, disk, DaRT, is, på. Scope: SINGLE.",
+      "patternType": "RECURRING",
+      "scope": "SINGLE",
+      "trend": "ISOLATED",
+      "confidence": "MEDIUM",
+      "topics": [
+        "space",
+        "disk",
+        "DaRT",
+        "is",
+        "på"
+      ],
+      "evidence": [
+        {
+          "text": "E: Disk space is low (used > 95% and less than 8G free) - tfmsapt021",
+          "person": "Aktiebolaget Storstockholms Lokaltrafik"
+        },
+        {
+          "text": "VB: tfmsapa053 - Problem: E: Disk space is critically low (used > 97% and less than 4G free)",
+          "person": "Aktiebolaget Storstockholms Lokaltrafik"
+        },
+        {
+          "text": "Fullt på disk - tfmsapp093",
+          "person": "Aktiebolaget Storstockholms Lokaltrafik"
+        }
+      ],
+      "ticketCount": 3,
+      "ticketIds": [
+        "t17",
+        "t25",
+        "t30"
+      ]
+    },
+    {
+      "title": "PubTrans-systemets stabilitet",
+      "description": "7 ärenden. Ämnen: PubTrans. Scope: CROSS_TEAM.",
+      "patternType": "CROSS_TEAM",
+      "scope": "CROSS_TEAM",
+      "trend": "ISOLATED",
+      "confidence": "HIGH",
+      "topics": [
+        "PubTrans"
+      ],
+      "evidence": [
+        {
+          "text": "VB: Flöde från roslagsbanan",
+          "person": "Aktiebolaget Storstockholms Lokaltrafik"
+        },
+        {
+          "text": "VR - E32 - APC data",
+          "person": "VR Sverige AB"
+        },
+        {
+          "text": "VB: KTF Testlinje ",
+          "person": "Region Dalarna"
+        }
+      ],
+      "ticketCount": 7,
+      "ticketIds": [
+        "t19",
+        "t261",
+        "t123",
+        "t198",
+        "t43",
+        "t237",
+        "t23"
+      ]
+    },
+    {
+      "title": "Problemer med TIMS-start och funktioner",
+      "description": "3 ärenden. Ämnen: TIMS, operation, traffic, av, control. Scope: CROSS_PERSON.",
+      "patternType": "CROSS_PERSON",
+      "scope": "CROSS_PERSON",
+      "trend": "ISOLATED",
+      "confidence": "MEDIUM",
+      "topics": [
+        "TIMS",
+        "operation",
+        "traffic",
+        "av",
+        "control"
+      ],
+      "evidence": [
+        {
+          "text": "Problem med uppstart av TIMS i acceptansmiljön",
+          "person": "Aktiebolaget Storstockholms Lokaltrafik"
+        },
+        {
+          "text": "TIMS - some messages are not published in all consumers",
+          "person": "Trafikselskabet Movia"
+        },
+        {
+          "text": "Kan inte ladda statistiken",
+          "person": "Region Kronoberg"
+        }
+      ],
+      "ticketCount": 3,
+      "ticketIds": [
+        "t26",
+        "t235",
+        "t164"
+      ]
+    },
+    {
+      "title": "TIMS-fel vid användning",
+      "description": "5 ärenden. Ämnen: TIMS, CGI, #0, ärendenummer, ctrl+a. Scope: CROSS_PERSON.",
+      "patternType": "CROSS_PERSON",
+      "scope": "CROSS_PERSON",
+      "trend": "ISOLATED",
+      "confidence": "HIGH",
+      "topics": [
+        "TIMS",
+        "CGI",
+        "#0",
+        "ärendenummer",
+        "ctrl+a"
+      ],
+      "evidence": [
+        {
+          "text": "Går inte att avsluta Timsärende 10296288",
+          "person": "Aktiebolaget Storstockholms Lokaltrafik"
+        },
+        {
+          "text": "#0[1003]:3071629#   Angående ärendenummer 3071629, Tims fungerar inte (Respons: 132394)",
+          "person": "Region Örebro Län"
+        },
+        {
+          "text": "#0[1003]:3069055#   Angående ärendenummer 3069055, Felanmälan att Linje 51 och 52 saknas i TIMS",
+          "person": "Region Örebro Län"
+        }
+      ],
+      "ticketCount": 5,
+      "ticketIds": [
+        "t41",
+        "t170",
+        "t171",
+        "t22",
+        "t29"
+      ]
+    },
+    {
+      "title": "Fordonssystem fungerar inte",
+      "description": "3 ärenden. Ämnen: dynamics, fordon, fungerar. Scope: CROSS_PERSON.",
+      "patternType": "CROSS_PERSON",
+      "scope": "CROSS_PERSON",
+      "trend": "ISOLATED",
+      "confidence": "MEDIUM",
+      "topics": [
+        "dynamics",
+        "fordon",
+        "fungerar"
+      ],
+      "evidence": [
+        {
+          "text": "Installation DriverService  Keolis UAT",
+          "person": "Hogia Public Transport Products AB"
+        },
+        {
+          "text": "Lägga upp fordon i BRUM",
+          "person": "Hogia Public Transport Products AB"
+        },
+        {
+          "text": "Testmiljön, fungerar inte att replikera ett fordon",
+          "person": "Region Västmanland"
+        }
+      ],
+      "ticketCount": 3,
+      "ticketIds": [
+        "t44",
+        "t45",
+        "t211"
+      ]
+    },
+    {
+      "title": "IT-maintenance servicefönster",
+      "description": "3 ärenden. Ämnen: maintenance, 500x, nästa, it maintenance, 500x hogia. Scope: CROSS_PERSON.",
+      "patternType": "CROSS_PERSON",
+      "scope": "CROSS_PERSON",
+      "trend": "ISOLATED",
+      "confidence": "MEDIUM",
+      "topics": [
+        "maintenance",
+        "500x",
+        "nästa",
+        "it maintenance",
+        "500x hogia"
+      ],
+      "evidence": [
+        {
+          "text": "Re: Hogia- Tieto  LIJ Production 11.2. rescheduling",
+          "person": "Hogia Public Transport Systems Aktiebolag"
+        },
+        {
+          "text": "Servicefönster nästa vecka / IT maintenance next week 500x - Hogia",
+          "person": "Red Funnel"
+        },
+        {
+          "text": "Servicefönster ikväll / IT maintenance tonight 500x - Hogia",
+          "person": "Red Funnel"
+        }
+      ],
+      "ticketCount": 3,
+      "ticketIds": [
+        "t46",
+        "t108",
+        "t109"
+      ]
+    },
+    {
+      "title": "TaskAssignment service fel",
+      "description": "3 ärenden. Ämnen: TaskAssignment, TransitCloud, fungerar, samt, ej. Scope: CROSS_PERSON.",
+      "patternType": "CROSS_PERSON",
+      "scope": "CROSS_PERSON",
+      "trend": "ISOLATED",
+      "confidence": "MEDIUM",
+      "topics": [
+        "TaskAssignment",
+        "TransitCloud",
+        "fungerar",
+        "samt",
+        "ej"
+      ],
+      "evidence": [
+        {
+          "text": "[ALERT] n8n unavailable — fallback workflow enabled",
+          "person": "Hogia Public Transport Systems Aktiebolag"
+        },
+        {
+          "text": "Uppgradering TransitCloud 25.11 samt TaskAssignment Service",
+          "person": "Møre og Romsdal Fylkeskommune"
+        },
+        {
+          "text": "TaskAssignment Service konfiguration fungerar ej",
+          "person": "Møre og Romsdal Fylkeskommune"
+        }
+      ],
+      "ticketCount": 3,
+      "ticketIds": [
+        "t47",
+        "t99",
+        "t100"
+      ]
+    },
+    {
+      "title": "Fördelade ärenden om InGrid",
+      "description": "5 ärenden. Ämnen: InGrid. Scope: CROSS_PERSON.",
+      "patternType": "CROSS_PERSON",
+      "scope": "CROSS_PERSON",
+      "trend": "ISOLATED",
+      "confidence": "HIGH",
+      "topics": [
+        "InGrid"
+      ],
+      "evidence": [
+        {
+          "text": "Fwd: Linje 595 [#INC-16605]",
+          "person": "Keolis Sverige AB"
+        },
+        {
+          "text": "Fwd: VB: Tidigare ärende om 523 [#INC-16506]",
+          "person": "Keolis Sverige AB"
+        },
+        {
+          "text": "Fwd: Depåstatus  [#INC-16362]",
+          "person": "Keolis Sverige AB"
+        }
+      ],
+      "ticketCount": 5,
+      "ticketIds": [
+        "t48",
+        "t71",
+        "t65",
+        "t52",
+        "t80"
+      ]
+    },
+    {
+      "title": "Kista-zonejusteringer och infraändringar",
+      "description": "11 ärenden. Ämnen: E22, E42, L155, kista, körlänk. Scope: SINGLE.",
+      "patternType": "RECURRING",
+      "scope": "SINGLE",
+      "trend": "ISOLATED",
+      "confidence": "HIGH",
+      "topics": [
+        "E22",
+        "E42",
+        "L155",
+        "kista",
+        "körlänk"
+      ],
+      "evidence": [
+        {
+          "text": "E42: Infraändring justering av körlänk L155",
+          "person": "Keolis Sverige AB"
+        },
+        {
+          "text": "E42 infraändring justering av körlänk Lintavägen -Bromma Handelscenter L155",
+          "person": "Keolis Sverige AB"
+        },
+        {
+          "text": "E22 infraändring: Zonjustering flera hållplatser, byte till polygon",
+          "person": "Keolis Sverige AB"
+        }
+      ],
+      "ticketCount": 11,
+      "ticketIds": [
+        "t49",
+        "t72",
+        "t51",
+        "t53",
+        "t54",
+        "t55",
+        "t56",
+        "t74",
+        "t59",
+        "t64",
+        "t70"
+      ]
+    },
+    {
+      "title": "OCS och OCA inloggningsproblemer",
+      "description": "5 ärenden. Ämnen: OCS, OCA. Scope: CROSS_PERSON.",
+      "patternType": "CROSS_PERSON",
+      "scope": "CROSS_PERSON",
+      "trend": "ISOLATED",
+      "confidence": "HIGH",
+      "topics": [
+        "OCS",
+        "OCA"
+      ],
+      "evidence": [
+        {
+          "text": "Re: Förarplattan. [#INC-16194] CAS-2606264",
+          "person": "Keolis Sverige AB"
+        },
+        {
+          "text": "Sv: Inloggning OCA",
+          "person": "Region Örebro Län"
+        },
+        {
+          "text": "VB: VSIintegration",
+          "person": "Region Skåne"
+        }
+      ],
+      "ticketCount": 5,
+      "ticketIds": [
+        "t50",
+        "t175",
+        "t181",
+        "t73",
+        "t192"
+      ]
+    },
+    {
+      "title": "Anmälningar och behörigheter",
+      "description": "5 ärenden. Scope: CROSS_TEAM.",
+      "patternType": "CROSS_TEAM",
+      "scope": "CROSS_TEAM",
+      "trend": "ISOLATED",
+      "confidence": "MEDIUM",
+      "topics": [],
+      "evidence": [
+        {
+          "text": "P3: Anmälan på omlopp, förarplatta UL",
+          "person": "Keolis Sverige AB"
+        },
+        {
+          "text": "Trafikledare som kan anmäla / avanmäla utan behörigheter.  ",
+          "person": "Region Jönköpings Län"
+        },
+        {
+          "text": "Skyltning",
+          "person": "Svealandstrafiken AB"
+        }
+      ],
+      "ticketCount": 5,
+      "ticketIds": [
+        "t57",
+        "t148",
+        "t227",
+        "t89",
+        "t156"
+      ]
+    },
+    {
+      "title": "E22-linjen",
+      "description": "4 ärenden. Ämnen: E22, PubTrans, base. Scope: CROSS_PERSON.",
+      "patternType": "CROSS_PERSON",
+      "scope": "CROSS_PERSON",
+      "trend": "ISOLATED",
+      "confidence": "MEDIUM",
+      "topics": [
+        "E22",
+        "PubTrans",
+        "base"
+      ],
+      "evidence": [
+        {
+          "text": "E22 Drevergatan",
+          "person": "Keolis Sverige AB"
+        },
+        {
+          "text": "E22 Norra Stationsgatan",
+          "person": "Keolis Sverige AB"
+        },
+        {
+          "text": "E22 Hållplats Fridhemsgatan",
+          "person": "Keolis Sverige AB"
+        }
+      ],
+      "ticketCount": 4,
+      "ticketIds": [
+        "t58",
+        "t62",
+        "t63",
+        "t163"
+      ]
+    },
+    {
+      "title": "Problemer med fordon i TransitCloud",
+      "description": "3 ärenden. Ämnen: fordon, vehicle, TransitCloud, web, journey. Scope: CROSS_PERSON.",
+      "patternType": "CROSS_PERSON",
+      "scope": "CROSS_PERSON",
+      "trend": "ISOLATED",
+      "confidence": "MEDIUM",
+      "topics": [
+        "fordon",
+        "vehicle",
+        "TransitCloud",
+        "web",
+        "journey"
+      ],
+      "evidence": [
+        {
+          "text": "Problem med VJS?",
+          "person": "Kollektivtrafiksförvaltningen UL"
+        },
+        {
+          "text": "VL: 2 nya fordon",
+          "person": "Region Västmanland"
+        },
+        {
+          "text": "VB: Nyinstallation HWD",
+          "person": "Region Jönköpings Län"
+        }
+      ],
+      "ticketCount": 3,
+      "ticketIds": [
+        "t79",
+        "t213",
+        "t149"
+      ]
+    },
+    {
+      "title": "Problemer med PubTrans-systemet",
+      "description": "3 ärenden. Ämnen: PubTrans, flödesövervakning, ner. Scope: CROSS_PERSON.",
+      "patternType": "CROSS_PERSON",
+      "scope": "CROSS_PERSON",
+      "trend": "ISOLATED",
+      "confidence": "MEDIUM",
+      "topics": [
+        "PubTrans",
+        "flödesövervakning",
+        "ner"
+      ],
+      "evidence": [
+        {
+          "text": "Problem med Kerberosdelegering för PubTrans",
+          "person": "Kollektivtrafiksförvaltningen UL"
+        },
+        {
+          "text": "Migrering distributörer PROD 18/2",
+          "person": "Västtrafik AB"
+        },
+        {
+          "text": "Replikering GEO-DB-AG-PPROD tas ner",
+          "person": "Västtrafik AB"
+        }
+      ],
+      "ticketCount": 3,
+      "ticketIds": [
+        "t82",
+        "t248",
+        "t250"
+      ]
+    },
+    {
+      "title": "Problemet med MAC-adresser",
+      "description": "6 ärenden. Ämnen: MAC, TCOBS, AVMS, PreperationService, TransitCloud. Scope: CROSS_PERSON.",
+      "patternType": "CROSS_PERSON",
+      "scope": "CROSS_PERSON",
+      "trend": "ISOLATED",
+      "confidence": "HIGH",
+      "topics": [
+        "MAC",
+        "TCOBS",
+        "AVMS",
+        "PreperationService",
+        "TransitCloud"
+      ],
+      "evidence": [
+        {
+          "text": "Byta MAC adress prio",
+          "person": "Mohlins Bussar AB"
+        },
+        {
+          "text": "Ny MAC adress prio",
+          "person": "Mohlins Bussar AB"
+        },
+        {
+          "text": "Byt MAC adress prio",
+          "person": "Mohlins Bussar AB"
+        }
+      ],
+      "ticketCount": 6,
+      "ticketIds": [
+        "t90",
+        "t93",
+        "t91",
+        "t127",
+        "t137",
+        "t145"
+      ]
+    },
+    {
+      "title": "Ny linjer och systemkonfigurationer",
+      "description": "6 ärenden. Ämnen: PubTrans, base. Scope: CROSS_TEAM.",
+      "patternType": "CROSS_TEAM",
+      "scope": "CROSS_TEAM",
+      "trend": "ISOLATED",
+      "confidence": "HIGH",
+      "topics": [
+        "PubTrans",
+        "base"
+      ],
+      "evidence": [
+        {
+          "text": "opplasting til Consat",
+          "person": "Møre og Romsdal Fylkeskommune"
+        },
+        {
+          "text": "Ny linje",
+          "person": "Region Värmland"
+        },
+        {
+          "text": "fel vid import",
+          "person": "Region Gävleborg"
+        }
+      ],
+      "ticketCount": 6,
+      "ticketIds": [
+        "t94",
+        "t205",
+        "t133",
+        "t173",
+        "t95",
+        "t61"
+      ]
+    },
+    {
+      "title": "Manglar i PubTrans-systemet",
+      "description": "3 ärenden. Ämnen: mangler, kvalitetsrapporten, deviation, realtime, PubTrans. Scope: CROSS_PERSON.",
+      "patternType": "CROSS_PERSON",
+      "scope": "CROSS_PERSON",
+      "trend": "ISOLATED",
+      "confidence": "MEDIUM",
+      "topics": [
+        "mangler",
+        "kvalitetsrapporten",
+        "deviation",
+        "realtime",
+        "PubTrans"
+      ],
+      "evidence": [
+        {
+          "text": "Avstand mangler mellom holdeplasser",
+          "person": "Møre og Romsdal Fylkeskommune"
+        },
+        {
+          "text": "Inte missade hållplatser kvalitetsrapporten",
+          "person": "Region Gävleborg"
+        },
+        {
+          "text": "Oppdatere prognose ved ankomst",
+          "person": "Møre og Romsdal Fylkeskommune"
+        }
+      ],
+      "ticketCount": 3,
+      "ticketIds": [
+        "t96",
+        "t142",
+        "t101"
+      ]
+    },
+    {
+      "title": "OverridingWaypoints aktiverat",
+      "description": "3 ärenden. Ämnen: TransitCloud, OverridingWaypoints, på, fordon. Scope: CROSS_PERSON.",
+      "patternType": "CROSS_PERSON",
+      "scope": "CROSS_PERSON",
+      "trend": "ISOLATED",
+      "confidence": "MEDIUM",
+      "topics": [
+        "TransitCloud",
+        "OverridingWaypoints",
+        "på",
+        "fordon"
+      ],
+      "evidence": [
+        {
+          "text": "Oppdatering OverridingWaypoints",
+          "person": "Møre og Romsdal Fylkeskommune"
+        },
+        {
+          "text": "OverridingWaypoints ",
+          "person": "Region Gävleborg"
+        },
+        {
+          "text": "Cirklarnas betydelse på Track Map",
+          "person": "VR Sverige AB"
+        }
+      ],
+      "ticketCount": 3,
+      "ticketIds": [
+        "t102",
+        "t125",
+        "t264"
+      ]
+    },
+    {
+      "title": "Hantering av supportärenden",
+      "description": "3 ärenden. Ämnen: case, management, hogia, företag=20, instant. Scope: CROSS_PERSON.",
+      "patternType": "CROSS_PERSON",
+      "scope": "CROSS_PERSON",
+      "trend": "ISOLATED",
+      "confidence": "MEDIUM",
+      "topics": [
+        "case",
+        "management",
+        "hogia",
+        "företag=20",
+        "instant"
+      ],
+      "evidence": [
+        {
+          "text": "Hogia cloud",
+          "person": "Møre og Romsdal Fylkeskommune"
+        },
+        {
+          "text": "fordonskarta?",
+          "person": "Region Skåne"
+        },
+        {
+          "text": "Instant: Behörigheter i Instant för att hantera användare",
+          "person": "Region Skåne"
+        }
+      ],
+      "ticketCount": 3,
+      "ticketIds": [
+        "t103",
+        "t179",
+        "t187"
+      ]
+    },
+    {
+      "title": "Saknas spårningshistorik i TransitCloud",
+      "description": "7 ärenden. Ämnen: TransitCloud, spårningshistorik, spårningshistorik saknas, linjetrafik/beställningstrafik/kartor, saknas spårningshistorik. Scope: CROSS_PERSON.",
+      "patternType": "CROSS_PERSON",
+      "scope": "CROSS_PERSON",
+      "trend": "ISOLATED",
+      "confidence": "HIGH",
+      "topics": [
+        "TransitCloud",
+        "spårningshistorik",
+        "spårningshistorik saknas",
+        "linjetrafik/beställningstrafik/kartor",
+        "saknas spårningshistorik"
+      ],
+      "evidence": [
+        {
+          "text": "Spårningshistorik saknas idag 2026-02-11",
+          "person": "Region Dalarna"
+        },
+        {
+          "text": "Spårningshistorik saknas 2026-02-10",
+          "person": "Region Dalarna"
+        },
+        {
+          "text": "Saknas spårningshistorik 2026-02-06",
+          "person": "Region Dalarna"
+        }
+      ],
+      "ticketCount": 7,
+      "ticketIds": [
+        "t110",
+        "t115",
+        "t111",
+        "t119",
+        "t113",
+        "t174",
+        "t210"
+      ]
+    },
+    {
+      "title": "Regioner i Telefonboken",
+      "description": "4 ärenden. Ämnen: telefonboken, region, support, TransitCloud, linjetrafik/beställningstrafik/kartor. Scope: CROSS_PERSON.",
+      "patternType": "CROSS_PERSON",
+      "scope": "CROSS_PERSON",
+      "trend": "ISOLATED",
+      "confidence": "MEDIUM",
+      "topics": [
+        "telefonboken",
+        "region",
+        "support",
+        "TransitCloud",
+        "linjetrafik/beställningstrafik/kartor"
+      ],
+      "evidence": [
+        {
+          "text": "Felmeddelande från användare i Dalarna",
+          "person": "Region Dalarna"
+        },
+        {
+          "text": "VB: Telefonboken Region Värmland problem",
+          "person": "Region Västmanland"
+        },
+        {
+          "text": "VB:   CS40397134 - Ärende uppdaterat  - Region Dalarna| 0009D8058E84|Positioning på 1182910164_a1dd8108883148aabf37637eae575 - Support Plan for Smart Public Transpo",
+          "person": "Region Dalarna"
+        }
+      ],
+      "ticketCount": 4,
+      "ticketIds": [
+        "t112",
+        "t214",
+        "t121",
+        "t253"
+      ]
+    },
+    {
+      "title": "Problemet med kvalitetsrapporten",
+      "description": "3 ärenden. Ämnen: kvalitetsrapporten, report, kronoberg, traffic, justering. Scope: CROSS_PERSON.",
+      "patternType": "CROSS_PERSON",
+      "scope": "CROSS_PERSON",
+      "trend": "ISOLATED",
+      "confidence": "MEDIUM",
+      "topics": [
+        "kvalitetsrapporten",
+        "report",
+        "kronoberg",
+        "traffic",
+        "justering"
+      ],
+      "evidence": [
+        {
+          "text": "Kvalitetsrapporten radbryt ",
+          "person": "Region Gävleborg"
+        },
+        {
+          "text": "Sv: Kvalitetsrapporter och uppföljning",
+          "person": "Region Kalmar Län"
+        },
+        {
+          "text": "SV: Kronoberg önskar justering på HTQR rapporten",
+          "person": "Region Kronoberg"
+        }
+      ],
+      "ticketCount": 3,
+      "ticketIds": [
+        "t124",
+        "t151",
+        "t167"
+      ]
+    },
+    {
+      "title": "Problemet med TIMS",
+      "description": "7 ärenden. Ämnen: TIMS, tims. Scope: CROSS_TEAM.",
+      "patternType": "CROSS_TEAM",
+      "scope": "CROSS_TEAM",
+      "trend": "ISOLATED",
+      "confidence": "HIGH",
+      "topics": [
+        "TIMS",
+        "tims"
+      ],
+      "evidence": [
+        {
+          "text": "Tims löst",
+          "person": "Region Gävleborg"
+        },
+        {
+          "text": "Administration i TIMS",
+          "person": "Region Gävleborg"
+        },
+        {
+          "text": "Förlorade linjer i TIMS",
+          "person": "Region Gävleborg"
+        }
+      ],
+      "ticketCount": 7,
+      "ticketIds": [
+        "t131",
+        "t134",
+        "t132",
+        "t208",
+        "t76",
+        "t236",
+        "t69"
+      ]
+    },
+    {
+      "title": "Bussplanering och x-trafik",
+      "description": "6 ärenden. Ämnen: TransitCloud, buss. Scope: CROSS_TEAM.",
+      "patternType": "CROSS_TEAM",
+      "scope": "CROSS_TEAM",
+      "trend": "ISOLATED",
+      "confidence": "HIGH",
+      "topics": [
+        "TransitCloud",
+        "buss"
+      ],
+      "evidence": [
+        {
+          "text": "Buss 5705 x-trafik",
+          "person": "Region Gävleborg"
+        },
+        {
+          "text": "Buss 5044",
+          "person": "Region Örebro Län"
+        },
+        {
+          "text": "Buss 2012 ",
+          "person": "Region Skåne"
+        }
+      ],
+      "ticketCount": 6,
+      "ticketIds": [
+        "t136",
+        "t176",
+        "t191",
+        "t162",
+        "t105",
+        "t14"
+      ]
+    },
+    {
+      "title": "Nyheter och förbättringar",
+      "description": "3 ärenden. Ämnen: TIMS, InGrid, ny, OCS, linje. Scope: CROSS_PERSON.",
+      "patternType": "CROSS_PERSON",
+      "scope": "CROSS_PERSON",
+      "trend": "ISOLATED",
+      "confidence": "MEDIUM",
+      "topics": [
+        "TIMS",
+        "InGrid",
+        "ny",
+        "OCS",
+        "linje"
+      ],
+      "evidence": [
+        {
+          "text": "Kan man få med tågnummer i informationsmeddelanden.",
+          "person": "Region Gävleborg"
+        },
+        {
+          "text": "Ny linje för SJ-tåg",
+          "person": "Region Värmland"
+        },
+        {
+          "text": "Filtrera bort tåg i InGrid",
+          "person": "Region Gävleborg"
+        }
+      ],
+      "ticketCount": 3,
+      "ticketIds": [
+        "t140",
+        "t203",
+        "t143"
+      ]
+    },
+    {
+      "title": "Problemer med OCS och OCA",
+      "description": "10 ärenden. Ämnen: OCS, OCA, kartor, kartvy, klienter. Scope: CROSS_TEAM.",
+      "patternType": "CROSS_TEAM",
+      "scope": "CROSS_TEAM",
+      "trend": "ISOLATED",
+      "confidence": "HIGH",
+      "topics": [
+        "OCS",
+        "OCA",
+        "kartor",
+        "kartvy",
+        "klienter"
+      ],
+      "evidence": [
+        {
+          "text": "Sv: Ny avgångstid",
+          "person": "Region Kalmar Län"
+        },
+        {
+          "text": "Felanmälan OCA",
+          "person": "Region Kalmar Län"
+        },
+        {
+          "text": "Inloggning OCA/OCS",
+          "person": "Region Värmland"
+        }
+      ],
+      "ticketCount": 10,
+      "ticketIds": [
+        "t150",
+        "t153",
+        "t206",
+        "t204",
+        "t207",
+        "t185",
+        "t154",
+        "t219",
+        "t4",
+        "t122"
+      ]
+    },
+    {
+      "title": "Geografisk datafel i Qlik",
+      "description": "4 ärenden. Ämnen: qlik, geografi, traffic, quality. Scope: CROSS_PERSON.",
+      "patternType": "CROSS_PERSON",
+      "scope": "CROSS_PERSON",
+      "trend": "ISOLATED",
+      "confidence": "MEDIUM",
+      "topics": [
+        "qlik",
+        "geografi",
+        "traffic",
+        "quality"
+      ],
+      "evidence": [
+        {
+          "text": "qlik sense",
+          "person": "Region Kalmar Län"
+        },
+        {
+          "text": "KLT's qlik",
+          "person": "Region Kalmar Län"
+        },
+        {
+          "text": "Geografi Instant",
+          "person": "Region Kronoberg"
+        }
+      ],
+      "ticketCount": 4,
+      "ticketIds": [
+        "t152",
+        "t159",
+        "t161",
+        "t182"
+      ]
+    },
+    {
+      "title": "Problemet med Instant",
+      "description": "4 ärenden. Ämnen: instant, view, instant hogia, pro. Scope: CROSS_PERSON.",
+      "patternType": "CROSS_PERSON",
+      "scope": "CROSS_PERSON",
+      "trend": "ISOLATED",
+      "confidence": "MEDIUM",
+      "topics": [
+        "instant",
+        "view",
+        "instant hogia",
+        "pro"
+      ],
+      "evidence": [
+        {
+          "text": "Flyttade hållplatser i Instant",
+          "person": "Region Kronoberg"
+        },
+        {
+          "text": "Instant: Användare kommer inte åt Instant",
+          "person": "Region Skåne"
+        },
+        {
+          "text": "varför sätter Instant Malmö c som ej registrerad?",
+          "person": "Region Skåne"
+        }
+      ],
+      "ticketCount": 4,
+      "ticketIds": [
+        "t165",
+        "t183",
+        "t190",
+        "t184"
+      ]
+    },
+    {
+      "title": "Fordons visning felaktig i TransitCloud",
+      "description": "5 ärenden. Ämnen: fordonsvy, fleetify, TransitCloud, PubTrans. Scope: CROSS_PERSON.",
+      "patternType": "CROSS_PERSON",
+      "scope": "CROSS_PERSON",
+      "trend": "ISOLATED",
+      "confidence": "HIGH",
+      "topics": [
+        "fordonsvy",
+        "fleetify",
+        "TransitCloud",
+        "PubTrans"
+      ],
+      "evidence": [
+        {
+          "text": "#0[1003]:3088359#   Angående ärendenummer 3088359, --Fordon syns ej i Hogias karta",
+          "person": "Region Örebro Län"
+        },
+        {
+          "text": "7032",
+          "person": "Svealandstrafiken AB"
+        },
+        {
+          "text": "5020",
+          "person": "Svealandstrafiken AB"
+        }
+      ],
+      "ticketCount": 5,
+      "ticketIds": [
+        "t172",
+        "t223",
+        "t228",
+        "t169",
+        "t107"
+      ]
+    },
+    {
+      "title": "Önskemål och uppdateringar",
+      "description": "3 ärenden. Ämnen: instant, önskemål, is, saknar, om. Scope: CROSS_PERSON.",
+      "patternType": "CROSS_PERSON",
+      "scope": "CROSS_PERSON",
+      "trend": "ISOLATED",
+      "confidence": "MEDIUM",
+      "topics": [
+        "instant",
+        "önskemål",
+        "is",
+        "saknar",
+        "om"
+      ],
+      "evidence": [
+        {
+          "text": "Instant: Saknar uppdateringar på TLÅ:er/infomeddelande i Test Skånetrafiken",
+          "person": "Region Skåne"
+        },
+        {
+          "text": "TPA: Önskemål om utökad gränssnittsfunktion",
+          "person": "Västtrafik AB"
+        },
+        {
+          "text": "RTPS - CMT-client - Is it possible to have different reason codes available for Cancellations and Delays?",
+          "person": "Trafikselskabet Movia"
+        }
+      ],
+      "ticketCount": 3,
+      "ticketIds": [
+        "t186",
+        "t249",
+        "t240"
+      ]
+    },
+    {
+      "title": "PubTrans-systemets data och koordinater",
+      "description": "5 ärenden. Ämnen: pubtrans, mars, PubTrans, fria, attribut. Scope: CROSS_TEAM.",
+      "patternType": "CROSS_TEAM",
+      "scope": "CROSS_TEAM",
+      "trend": "ISOLATED",
+      "confidence": "HIGH",
+      "topics": [
+        "pubtrans",
+        "mars",
+        "PubTrans",
+        "fria",
+        "attribut"
+      ],
+      "evidence": [
+        {
+          "text": "Pubtrans data 2026-02-04",
+          "person": "Region Västmanland"
+        },
+        {
+          "text": "Pubtrans Helsingborg mars",
+          "person": "VR Sverige AB"
+        },
+        {
+          "text": "Pubtrans Kristianstad mars",
+          "person": "VR Sverige AB"
+        }
+      ],
+      "ticketCount": 5,
+      "ticketIds": [
+        "t212",
+        "t254",
+        "t257",
+        "t78",
+        "t196"
+      ]
+    },
+    {
+      "title": "Movias diskbyt i SQL-transaktioner",
+      "description": "3 ärenden. Ämnen: replaces, sql, transaction, movia, log. Scope: SINGLE.",
+      "patternType": "RECURRING",
+      "scope": "SINGLE",
+      "trend": "ISOLATED",
+      "confidence": "MEDIUM",
+      "topics": [
+        "replaces",
+        "sql",
+        "transaction",
+        "movia",
+        "log"
+      ],
+      "evidence": [
+        {
+          "text": "Movia replaces disk for sql transaction log in various servers",
+          "person": "Trafikselskabet Movia"
+        },
+        {
+          "text": "SV: CAS-2621413: Movia replaces disk for sql transaction log in various servers",
+          "person": "Trafikselskabet Movia"
+        },
+        {
+          "text": "Movia afholder servicevindue 09. februar ",
+          "person": "Trafikselskabet Movia"
+        }
+      ],
+      "ticketCount": 3,
+      "ticketIds": [
+        "t238",
+        "t246",
+        "t245"
+      ]
+    },
+    {
+      "title": "Linjer saknas i InGrid",
+      "description": "3 ärenden. Ämnen: InGrid, textmeddelande, saknas ingrid, PubTrans, base. Scope: SINGLE.",
+      "patternType": "RECURRING",
+      "scope": "SINGLE",
+      "trend": "ISOLATED",
+      "confidence": "MEDIUM",
+      "topics": [
+        "InGrid",
+        "textmeddelande",
+        "saknas ingrid",
+        "PubTrans",
+        "base"
+      ],
+      "evidence": [
+        {
+          "text": "SESD-20857 Linje 340 saknas i InGrid Textmeddelande",
+          "person": "VR Sverige AB"
+        },
+        {
+          "text": "Linje 340 saknas i InGrid Textmeddelande (SESD-20857)",
+          "person": "VR Sverige AB"
+        },
+        {
+          "text": "SESD-20857 Ekerö - Route/line 340 missing from thr2 ",
+          "person": "VR Sverige AB"
+        }
+      ],
+      "ticketCount": 3,
+      "ticketIds": [
+        "t255",
+        "t258",
+        "t260"
+      ]
+    }
+  ]
+}

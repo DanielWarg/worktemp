@@ -5,10 +5,17 @@
 
 export type ClusterItem = { id: string };
 
-const MIN_CLUSTER = 5;
-const TARGET_MIN = 20;
-const TARGET_MAX = 40;
-const SIMILARITY_THRESHOLD = 0.30;
+export type ClusterOptions = {
+  similarityThreshold?: number;  // default 0.42
+  minCluster?: number;           // default 3
+  targetMin?: number;            // default 8
+  targetMax?: number;            // default 20
+};
+
+const DEFAULT_MIN_CLUSTER = 3;
+const DEFAULT_TARGET_MIN = 8;
+const DEFAULT_TARGET_MAX = 12;
+const DEFAULT_SIMILARITY_THRESHOLD = 0.42;
 
 function cosineSimilarity(a: number[], b: number[]): number {
   let dot = 0;
@@ -22,8 +29,14 @@ function cosineSimilarity(a: number[], b: number[]): number {
  */
 export function clusterChallenges<T extends ClusterItem>(
   items: T[],
-  embeddings: Map<string, number[]>
+  embeddings: Map<string, number[]>,
+  options?: ClusterOptions,
 ): T[][] {
+  const MIN_CLUSTER = options?.minCluster ?? DEFAULT_MIN_CLUSTER;
+  const TARGET_MIN = options?.targetMin ?? DEFAULT_TARGET_MIN;
+  const TARGET_MAX = options?.targetMax ?? DEFAULT_TARGET_MAX;
+  const SIMILARITY_THRESHOLD = options?.similarityThreshold ?? DEFAULT_SIMILARITY_THRESHOLD;
+
   if (items.length <= TARGET_MAX) return [items];
 
   // Build similarity matrix
@@ -62,9 +75,9 @@ export function clusterChallenges<T extends ClusterItem>(
     // Stop merging if best similarity is too low
     if (bestSim < SIMILARITY_THRESHOLD) break;
 
-    // Stop if merging would exceed target max
+    // Hard cap: never exceed target max
     const mergedSize = clusters[bestI].indices.length + clusters[bestJ].indices.length;
-    if (mergedSize > TARGET_MAX && clusters[bestI].indices.length >= MIN_CLUSTER && clusters[bestJ].indices.length >= MIN_CLUSTER) {
+    if (mergedSize > TARGET_MAX) {
       break;
     }
 
@@ -83,7 +96,7 @@ export function clusterChallenges<T extends ClusterItem>(
         let bestSim = -1;
         for (let j = 0; j < clusters.length; j++) {
           if (j === i) continue;
-          if (clusters[j].indices.length + clusters[i].indices.length > TARGET_MAX + 5) continue;
+          if (clusters[j].indices.length + clusters[i].indices.length > TARGET_MAX) continue;
           const sim = avgLinkage(clusters[i].indices, clusters[j].indices, vecs);
           if (sim > bestSim) {
             bestSim = sim;

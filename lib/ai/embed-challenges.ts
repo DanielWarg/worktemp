@@ -1,7 +1,9 @@
 /**
- * Embed challenges using Transformers.js (all-MiniLM-L6-v2).
- * Returns 384-dim vectors. Runs on CPU, ~2s for 265 items.
+ * Embed challenges using Transformers.js (multilingual MiniLM).
+ * Returns 384-dim vectors. Runs on CPU, ~3s for 265 items.
  */
+
+export const EMBED_MODEL = "Xenova/paraphrase-multilingual-MiniLM-L12-v2";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let pipelinePromise: Promise<any> | null = null;
@@ -9,7 +11,7 @@ let pipelinePromise: Promise<any> | null = null;
 async function getEmbedder() {
   if (!pipelinePromise) {
     pipelinePromise = import("@huggingface/transformers").then((m) =>
-      m.pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2", { dtype: "fp32" })
+      m.pipeline("feature-extraction", EMBED_MODEL, { dtype: "fp32" })
     );
   }
   return pipelinePromise;
@@ -48,7 +50,7 @@ export async function embedChallenges(
   const texts = toEmbed.map((c) => {
     const parts = [c.text];
     if (c.tags?.length) parts.push(`[${c.tags.join(", ")}]`);
-    if (c.person) parts.push(`(${c.person})`);
+    // person excluded — causes same-reporter clustering bias
     return parts.join(" ");
   });
 
