@@ -11,7 +11,7 @@ type PersonCardProps = {
 
 export function PersonCard({ person, isSelected, onClick }: PersonCardProps) {
   const staleness = stalenessLabel(person.lastActiveAt);
-  const openChallenges = person.challenges?.filter((c) => c.status === "OPEN").length ?? 0;
+  const challengeCount = person._count?.challenges ?? person.challenges?.filter((c) => c.status === "OPEN").length ?? 0;
 
   return (
     <button
@@ -30,9 +30,9 @@ export function PersonCard({ person, isSelected, onClick }: PersonCardProps) {
           {initialsFromName(person.name)}
         </div>
         <div className="flex flex-wrap gap-2 text-[10px] uppercase tracking-[0.14em] opacity-50">
-          {openChallenges > 0 && (
+          {challengeCount > 0 && (
             <span className="rounded-full bg-[var(--color-copper-500)]/20 px-2 py-0.5 text-[var(--color-copper-400)] opacity-100">
-              {openChallenges} utmaning{openChallenges > 1 ? "ar" : ""}
+              {challengeCount} utmaning{challengeCount > 1 ? "ar" : ""}
             </span>
           )}
           {person.notes.length > 0 && <span>{person.notes.length} ant.</span>}

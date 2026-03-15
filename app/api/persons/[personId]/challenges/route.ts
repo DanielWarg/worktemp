@@ -12,6 +12,7 @@ export async function GET(
     where: { personId },
     orderBy: { createdAt: "desc" },
     include: {
+      tags: { include: { tag: true } },
       session: { select: { id: true, title: true, startedAt: true } },
     },
   });

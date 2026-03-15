@@ -338,6 +338,7 @@ export function WorkspaceShell({ workspaceId }: { workspaceId: string }) {
 
           {selectedPerson ? (
             <PersonDetailPanel
+              key={selectedPerson.id}
               person={selectedPerson}
               team={selectedTeam}
               teams={teams}

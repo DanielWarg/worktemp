@@ -54,7 +54,8 @@ export type PersonData = {
   lastActiveAt: string | null;
   notes: NoteData[];
   attachments: AttachmentData[];
-  challenges: ChallengeData[];
+  challenges?: ChallengeData[];
+  _count?: { challenges: number };
 };
 
 export type MembershipData = {
