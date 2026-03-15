@@ -106,14 +106,20 @@ export function classifyTicket(title: string, _tags: string[] = []): { ticketCla
 }
 
 /**
- * Find duplicate candidates: same title (normalized) from same person.
+ * Find duplicate candidates: same title (normalized) from same person
+ * within the same session or import batch.
+ *
+ * Cross-session duplicates are intentionally kept — they prove a recurring issue.
+ * Only within-batch duplicates (copy-paste, double-submit) are filtered.
  */
-export function findDuplicates(items: { id: string; text: string; person: string }[]): Set<string> {
+export function findDuplicates(items: { id: string; text: string; person: string; batchKey?: string }[]): Set<string> {
   const seen = new Map<string, string>(); // normalized key → first id
   const dupes = new Set<string>();
 
   for (const item of items) {
-    const key = `${item.person}::${normalizeTitle(item.text)}`;
+    // Scope dedup to the same batch (session/import). Cross-batch = recurring, not duplicate.
+    const batch = item.batchKey ?? "__global__";
+    const key = `${batch}::${item.person}::${normalizeTitle(item.text)}`;
     if (seen.has(key)) {
       dupes.add(item.id);
     } else {

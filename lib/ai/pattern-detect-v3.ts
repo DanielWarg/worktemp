@@ -61,6 +61,7 @@ export async function detectPatternsV3(workspaceId: string) {
       id: c.id,
       text: c.contentNormalized || c.contentRaw,
       person: c.person.name,
+      batchKey: c.sessionId || c.importId || c.id,
     }))
   );
   for (const id of duplicateIds) {
@@ -279,11 +280,18 @@ export async function detectPatternsV3(workspaceId: string) {
       const chatFn = (msgs: { role: "system" | "user" | "assistant"; content: string }[], maxTokens: number) =>
         ollamaChat(msgs, maxTokens, "qwen2.5:7b");
 
+      // Build lookup for ticket texts
+      const ticketTexts = new Map<string, string>();
+      for (const c of coreTickets) {
+        ticketTexts.set(c.id, c.contentNormalized || c.contentRaw);
+      }
+
       const forPolish: PatternForPolish[] = patterns.map((p) => ({
         title: p.title,
         entities: p.entities,
         ticketCount: p.ticketIds.length,
         evidence: p.evidence,
+        allTicketTexts: p.ticketIds.map((id) => ticketTexts.get(id) || "").filter(Boolean),
       }));
 
       const polished = await polishWithSuggestions(forPolish, chatFn);

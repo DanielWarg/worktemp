@@ -72,6 +72,7 @@ export async function detectPatternsV4(workspaceId: string, options?: V4Options)
       id: c.id,
       text: c.contentNormalized || c.contentRaw,
       person: c.person.name,
+      batchKey: c.sessionId || c.importId || c.id,
     }))
   );
   for (const id of duplicateIds) {
