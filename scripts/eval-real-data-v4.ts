@@ -16,7 +16,7 @@ import { clusterChallenges, type ClusterOptions } from "../lib/ai/cluster-challe
 import { classifyTicket, findDuplicates, type TicketClass } from "../lib/ai/pre-classify";
 import { extractCorpusTopics, aggregateClusterTopics } from "../lib/ai/topic-extract";
 import { deduplicatePatterns } from "../lib/ai/pattern-dedup";
-import { calcTrend, calcScopeByOrg, calcConfidence, type ScopeType, type ConfidenceLevel } from "../lib/ai/trend-calc";
+import { calcTrend, calcScopeByOrg, calcConfidence, type TrendType, type ScopeType, type ConfidenceLevel } from "../lib/ai/trend-calc";
 import { polishWithSuggestions, type PatternForPolish } from "../lib/ai/title-polish";
 
 config({ path: new URL("../.env.local", import.meta.url).pathname });
