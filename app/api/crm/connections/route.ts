@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { encryptApiKey } from "@/lib/crm/crypto";
 
 // GET /api/crm/connections?workspaceId=xxx
 export async function GET(request: Request) {
@@ -46,7 +47,7 @@ export async function POST(request: Request) {
       workspaceId,
       provider,
       displayName: displayName || provider,
-      apiKeyEncrypted: apiKey, // In production: encrypt before storing
+      apiKeyEncrypted: encryptApiKey(apiKey),
       baseUrl: baseUrl ?? null,
     },
   });
