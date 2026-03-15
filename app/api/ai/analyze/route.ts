@@ -8,6 +8,7 @@ import { normalizeChallengesLocal } from "@/lib/ai/local-normalize";
 import { autoTagChallengesLocal } from "@/lib/ai/local-auto-tag";
 import { detectPatternsAILocal } from "@/lib/ai/local-detect-patterns";
 import { detectPatternsV2 } from "@/lib/ai/local-detect-patterns-v2";
+import { detectPatternsV3 } from "@/lib/ai/pattern-detect-v3";
 import { generateSuggestionsLocal } from "@/lib/ai/local-suggest";
 import { refinePatternsLocal } from "@/lib/ai/local-refine";
 
@@ -63,12 +64,15 @@ export async function POST(request: Request) {
     }
 
     if (requestedSteps.includes("patterns")) {
-      const useV2 = isLocal && pipelineVersion !== "v1";
-      const r = useV2
-        ? await detectPatternsV2(workspaceId, ctx)
-        : isLocal
-          ? await detectPatternsAILocal(workspaceId, ctx)
-          : await detectPatternsAI(workspaceId, ctx);
+      const r = pipelineVersion === "v3"
+        ? await detectPatternsV3(workspaceId)
+        : pipelineVersion === "v1"
+          ? isLocal
+            ? await detectPatternsAILocal(workspaceId, ctx)
+            : await detectPatternsAI(workspaceId, ctx)
+          : isLocal
+            ? await detectPatternsV2(workspaceId, ctx)
+            : await detectPatternsAI(workspaceId, ctx);
       results.patterns = r;
       if ("failedBatches" in r && r.failedBatches) warnings.push(`${STEP_LABELS.patterns}: ${r.failedBatches} av ${r.batches} batchar misslyckades`);
     }
