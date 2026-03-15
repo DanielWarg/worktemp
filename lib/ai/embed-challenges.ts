@@ -25,7 +25,8 @@ export type ChallengeForEmbed = {
   person?: string;
 };
 
-// Simple in-memory cache keyed by challenge id
+// LRU cache keyed by challenge id — capped to prevent memory leaks
+const CACHE_MAX = 5000;
 const cache = new Map<string, number[]>();
 
 export async function embedChallenges(
@@ -61,6 +62,11 @@ export async function embedChallenges(
   // Extract vectors from the output tensor
   for (let i = 0; i < toEmbed.length; i++) {
     const vec = Array.from((output[i].data ?? output.data.slice(i * EMBED_DIM, (i + 1) * EMBED_DIM)) as Float32Array);
+    // Evict oldest entries if cache is full
+    if (cache.size >= CACHE_MAX) {
+      const first = cache.keys().next().value!;
+      cache.delete(first);
+    }
     cache.set(toEmbed[i].id, vec);
     result.set(toEmbed[i].id, vec);
   }

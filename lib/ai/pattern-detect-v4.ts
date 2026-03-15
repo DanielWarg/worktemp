@@ -284,45 +284,50 @@ export async function detectPatternsV4(workspaceId: string, options?: V4Options)
   const confDist = countBy(patterns, (p) => p.confidence);
   console.log(`[v4] Scope: ${fmtDist(scopeDist)} | Trend: ${fmtDist(trendDist)} | Confidence: ${fmtDist(confDist)}`);
 
-  // ─── Persist to DB ───
+  // ─── Persist to DB (single transaction) ───
   const existingPatterns = await prisma.pattern.findMany({
     where: { workspaceId },
     select: { title: true },
   });
   const existingTitles = new Set(existingPatterns.map((p) => p.title.toLowerCase()));
 
+  const toCreate = patterns.filter(
+    (p) => p.ticketIds.length >= 2 && !existingTitles.has(p.title.toLowerCase())
+  );
+
   let created = 0;
-  for (const p of patterns) {
-    if (existingTitles.has(p.title.toLowerCase())) continue;
-    if (p.ticketIds.length < 2) continue;
+  if (toCreate.length > 0) {
+    await prisma.$transaction(async (tx) => {
+      for (const p of toCreate) {
+        const pattern = await tx.pattern.create({
+          data: {
+            workspaceId,
+            title: p.title,
+            description: p.description,
+            patternType: p.patternType,
+            source: "AI_DETECTED",
+            status: "EMERGING",
+            occurrenceCount: p.ticketIds.length,
+            patternChallenges: {
+              create: p.ticketIds.map((challengeId) => ({ challengeId })),
+            },
+          },
+        });
 
-    const pattern = await prisma.pattern.create({
-      data: {
-        workspaceId,
-        title: p.title,
-        description: p.description,
-        patternType: p.patternType,
-        source: "AI_DETECTED",
-        status: "EMERGING",
-        occurrenceCount: p.ticketIds.length,
-        patternChallenges: {
-          create: p.ticketIds.map((challengeId) => ({ challengeId })),
-        },
-      },
+        if (p.suggestion) {
+          await tx.suggestion.create({
+            data: {
+              patternId: pattern.id,
+              content: p.suggestion,
+              source: "AI_GENERATED",
+              status: "PENDING",
+            },
+          });
+        }
+
+        created++;
+      }
     });
-
-    if (p.suggestion) {
-      await prisma.suggestion.create({
-        data: {
-          patternId: pattern.id,
-          content: p.suggestion,
-          source: "AI_GENERATED",
-          status: "PENDING",
-        },
-      });
-    }
-
-    created++;
   }
 
   const coveredIds = new Set(patterns.flatMap((p) => p.ticketIds));
