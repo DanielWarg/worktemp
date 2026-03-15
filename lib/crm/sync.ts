@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db/prisma";
 import { CRM_PROVIDERS } from "./providers";
+import { decryptApiKey } from "./crypto";
 
 // Run sync for a CRM connection — fetch tickets and create snapshots
 export async function syncCrmConnection(connectionId: string) {
@@ -24,7 +25,7 @@ export async function syncCrmConnection(connectionId: string) {
 
   const result = await syncFn(
     connection.baseUrl || "",
-    connection.apiKeyEncrypted // In production, decrypt this
+    decryptApiKey(connection.apiKeyEncrypted)
   );
 
   if (result.error) {

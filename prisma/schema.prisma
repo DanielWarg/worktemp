@@ -197,6 +197,7 @@ model Challenge {
   contentRaw         String
   contentNormalized  String?
   customerName       String?
+  embedding          Bytes?   // 384-dim Float32Array as binary (1536 bytes)
   sourceType         String   @default("MEETING") // MEETING | HISTORICAL | IMPORT | BETWEEN_MEETINGS
   status             String   @default("OPEN")    // OPEN | ACKNOWLEDGED | RESOLVED
   createdAt          DateTime @default(now())
