@@ -41,31 +41,42 @@ jobs:
           fi
           echo "present=true" >> "$GITHUB_OUTPUT"
 
-      - name: Ensure Vercel secrets exist
+      - name: Detect Vercel secrets
         if: steps.app.outputs.present == 'true'
+        id: vercel
+        run: |
+          if [ -n "$VERCEL_ORG_ID" ] && [ -n "$VERCEL_PROJECT_ID" ] && [ -n "$VERCEL_TOKEN" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "Vercel secrets are missing; skipping preview deployment."
+          fi
+
+      - name: Ensure Vercel secrets exist
+        if: steps.app.outputs.present == 'true' && steps.vercel.outputs.present == 'true'
         run: |
           test -n "$VERCEL_ORG_ID"
           test -n "$VERCEL_PROJECT_ID"
           test -n "$VERCEL_TOKEN"
 
       - name: Set up Node.js
-        if: steps.app.outputs.present == 'true'
+        if: steps.app.outputs.present == 'true' && steps.vercel.outputs.present == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
       - name: Install Vercel CLI
-        if: steps.app.outputs.present == 'true'
+        if: steps.app.outputs.present == 'true' && steps.vercel.outputs.present == 'true'
         run: npm install --global vercel@latest
 
       - name: Pull Vercel environment
-        if: steps.app.outputs.present == 'true'
+        if: steps.app.outputs.present == 'true' && steps.vercel.outputs.present == 'true'
         run: vercel pull --yes --environment=preview --token="$VERCEL_TOKEN"
 
       - name: Build preview artifact
-        if: steps.app.outputs.present == 'true'
+        if: steps.app.outputs.present == 'true' && steps.vercel.outputs.present == 'true'
         run: vercel build --token="$VERCEL_TOKEN"
 
       - name: Deploy preview
-        if: steps.app.outputs.present == 'true'
+        if: steps.app.outputs.present == 'true' && steps.vercel.outputs.present == 'true'
         run: vercel deploy --prebuilt --token="$VERCEL_TOKEN"

@@ -1,73 +1,138 @@
-# Team Structure Canvas
+```
+               ·· ··
+ _ __ ___   ___  _ __  ___| |_ ___ _ __
+| '_ ` _ \ / _ \| '_ \/ __| __/ _ \ '__|
+| | | | | | (_) | | | \__ \ ||  __/ |
+|_| |_| |_|\___/|_| |_|___/\__\___|_|
+               ¨  ¨
+```
 
-Grundrepo för Modul 1 av en SaaS-produkt där chefer och teamledare bygger upp sin teamstruktur i en visuell arbetsyta.
+**See the patterns your team misses.**
 
-## Status
+Mönster captures challenges during team meetings, detects recurring patterns with AI, and surfaces the problems that keep coming back — before they become crises.
 
-Repo:t innehåller just nu planering och projektfiler. Applikationen är inte scaffoldad ännu.
+Support tickets. HR complaints. Phone statistics. Meeting notes. If problems repeat, Mönster finds them.
 
-Se följande filer först:
-- `PLAN.md` för produkt- och leveransplan
-- `STATUS.md` för nuläge och rekommenderad startordning
-- `AGENTS.md` för repo-specifika arbetsregler
-- `docs/GIT_WORKFLOW.md` för branch-, PR- och deployflöde
-- `SECURITY.md` för regler kring hemligheter och frontend/backend-exponering
+### 100% local. Your data stays yours.
 
-## Modul 1 i korthet
+The entire AI pipeline runs on your machine. No API keys. No cloud dependency. No data leaves your hardware.
 
-- Auth och session
-- Workspace med flera team
-- Semi-strukturerad canvas
-- Personkort som kan organiseras inom och mellan team
-- Sidopanel för grundinfo, anteckningar och filer
-- Förberedd datamodell för framtida AI- och samarbetsfunktioner
+Want LLM-powered title polish? Run Ollama locally. Want cloud AI? Explicitly opt in. Your call.
 
-## Tekniska beslut från planen
+---
 
-- Next.js App Router
-- Tailwind CSS
-- Prisma + PostgreSQL
-- NextAuth.js
-- Zustand
-- `@dnd-kit`
-- Framer Motion
-- S3-kompatibel fillagring via presigned URLs
-- Deploy till Vercel
+## How it works
 
-## Rekommenderad implementationsordning
+```
+Capture  →  Analyze  →  Prioritize  →  Act
+```
 
-1. Scaffolda Next.js-projektet
-2. Lägg in tema-tokens, layout och app shell
-3. Modellera Prisma-schema och migreringar
-4. Implementera auth och workspace-flöde
-5. Bygg team/person CRUD
-6. Bygg canvas och drag-and-drop
-7. Bygg detaljpanel med autosave
-8. Lägg till filuppladdning och tester
+**Capture** — Record challenges during meetings. Click a person, type the issue, Enter. Zero friction.
 
-## Designriktning
+**Analyze** — One button. Embeds, clusters, extracts topics, deduplicates, scores. 2 seconds. No LLM.
 
-Produkten ska luta mot en mörkgrön premium-estetik med varm neutralt tonade ytor. Undvik generisk SaaS-look och håll fast vid kontrasten mellan mörk canvas och ljusa kort.
+**Prioritize** — Critical bugs, escalating trends, cross-team issues rise to the top. Suspected duplicates get flagged — is this a bug or a misconfiguration?
 
-## Scopegränser för Modul 1
+**Act** — Each pattern gets a suggested action. Connect your CRM to validate gut feelings with real data.
 
-Ingår inte:
-- AI-analys
-- dashboard/KPIer
-- realtidssamarbete
-- mobilanpassning
-- avancerad filhantering
-- integrationer
+---
 
-## Nästa praktiska steg
+## The pipeline
 
-Skapa appen och börja med fundament enligt `STATUS.md`.
+95% deterministic. Reproducible. Offline. The LLM is cosmetics.
 
-## CI/CD
+```
+Filter → Embed → Cluster → Topics → Dedup → Score → Polish
+  50ms    3s      300ms     400ms    100ms    50ms   +16s (opt)
+```
 
-Repo:t har nu GitHub Actions för:
-- CI på PR och push till `main`
-- preview-deploy till Vercel på PR när appen finns
-- production-deploy till Vercel på push till `main`
+| Step | What | AI? |
+|------|------|-----|
+| **Filter** | Noise removal, batch-scoped dedup | No |
+| **Embed** | Multilingual vectors (Swedish/English) | Local model |
+| **Cluster** | Agglomerative, max 12 per group | No |
+| **Topics** | N-gram TF-IDF, domain-agnostic | No |
+| **Dedup** | Centroid similarity + topic overlap | No |
+| **Score** | Trend, scope, confidence, priority | No |
+| **Polish** | Title + suggestion via local LLM | Optional |
 
-Deploy-workflows är medvetet skyddade och skippar tills repo:t faktiskt innehåller en app med `package.json`.
+**265 tickets → 35 patterns → 2.0s.** With title polish: 50s.
+
+Stress-tested across IT support, HR, phone stats, and meeting notes. 1000 tickets in 28s.
+
+### Why local-first
+
+Your team's problems are sensitive. They don't belong on someone else's server. Deterministic results mean you can trust and reproduce the analysis. Works offline. Works air-gapped. Cloud AI (Claude Sonnet 4) available as explicit opt-in for teams that want it.
+
+---
+
+## Stack
+
+Next.js 16 · React 19 · TypeScript · Prisma 7 · PostgreSQL · Tailwind 4
+
+## Quick start
+
+```bash
+pnpm install
+cp .env.example .env.local    # Add DATABASE_URL
+pnpm db:generate && pnpm db:push
+pnpm dev
+```
+
+```sql
+INSERT INTO "Account" (id, email, name, "createdAt", "updatedAt")
+VALUES ('demo-account-001', 'demo@worktemp.app', 'Demo User', NOW(), NOW())
+ON CONFLICT (id) DO NOTHING;
+```
+
+Open **http://localhost:3000/workspace**
+
+### Local LLM (optional)
+
+```bash
+ollama run qwen2.5:7b    # Title polish + suggestions
+```
+
+Auto-detected on port 11434. Without it, deterministic titles work fine.
+
+### Eval
+
+```bash
+npx tsx scripts/eval-real-data-v4.ts                        # Deterministic
+npx tsx scripts/eval-real-data-v4.ts --polish qwen2.5-7b    # With polish
+npx tsx scripts/stress-test-v4.ts                            # Multi-domain stress test
+```
+
+---
+
+## Structure
+
+```
+app/                     Pages + API routes
+components/workspace/    UI — canvas, meetings, patterns, CRM, history
+lib/ai/                  The pipeline
+  pattern-detect-v4.ts     Orchestrator
+  embed-challenges.ts      Multilingual embeddings
+  cluster-challenges.ts    Agglomerative clustering
+  topic-extract.ts         TF-IDF topics
+  pattern-dedup.ts         Dual-signal dedup
+  trend-calc.ts            Scoring
+  title-polish.ts          LLM polish
+  pre-classify.ts          Noise filter
+lib/crm/                 Freshdesk · Zendesk · HubSpot
+lib/db/                  Prisma + PostgreSQL
+```
+
+## Data model
+
+```
+Workspace → Team → Person → Challenge → Tag
+                                ↓
+                           Pattern → Suggestion
+                                ↓
+                           CRM Evidence
+```
+
+---
+
+*Mönster — se mönstren ditt team missar.*

@@ -1,0 +1,24 @@
+repo_id: worktemp
+source_paths:
+  - app
+  - components
+  - lib
+  - prisma
+  - docs
+  - .context/notes
+  - .context/decisions
+  - README.md
+  - CLAUDE.md
+truth_order:
+  - ADR
+  - RULE
+  - CODE
+  - WIKI
+ranking:
+  semantic: 0.40
+  graph: 0.25
+  trust: 0.20
+  recency: 0.15
+runtime:
+  top_k: 5
+  include_uncertainties: true
