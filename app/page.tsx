@@ -31,7 +31,7 @@ export default function Home() {
         <header className="flex items-center justify-between gap-4 border-b border-white/10 pb-6">
           <div>
             <h1 className="text-xl font-semibold tracking-tight text-white">
-              Team Problem Radar
+              Mönster
             </h1>
           </div>
           <a
@@ -52,9 +52,9 @@ export default function Home() {
               Se vad ditt team hanterar men aldrig adresserar.
             </h2>
             <p className="mt-6 max-w-2xl text-base leading-7 text-[var(--color-cream-100)]/78 md:text-lg">
-              Team Problem Radar fångar utmaningar under veckomöten, hittar
-              mönster med AI och kopplar dem till riktig CRM-data. Så att du
-              agerar på det som faktiskt spelar roll.
+              Fånga utmaningar under veckomöten, hitta mönster med AI
+              och koppla dem till riktig CRM-data. 100% lokalt — din data
+              lämnar aldrig din maskin.
             </p>
 
             <div className="mt-10 flex flex-wrap gap-4">
@@ -177,7 +177,7 @@ export default function Home() {
         {/* Footer */}
         <footer className="border-t border-white/10 pt-8 text-center">
           <p className="text-sm text-[var(--color-cream-100)]/50">
-            Team Problem Radar — byggt för teamledare som vill se hela bilden.
+            Mönster — se mönstren ditt team missar.
           </p>
         </footer>
       </div>

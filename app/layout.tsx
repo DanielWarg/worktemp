@@ -14,9 +14,9 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Team Structure Canvas",
+  title: "Mönster",
   description:
-    "Deployklar webbappgrund för Modul 1: workspace, teamstruktur och visuell canvas.",
+    "Se mönstren ditt team missar. Fångar utmaningar, hittar mönster med AI, kopplar till CRM-data.",
 };
 
 export default function RootLayout({

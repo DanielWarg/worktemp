@@ -1,4 +1,4 @@
-# Produktplan: Team Problem Radar
+# Produktplan: Mönster
 
 ## Kontext
 

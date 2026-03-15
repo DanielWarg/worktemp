@@ -1,5 +1,5 @@
 {
-  "name": "worktemp",
+  "name": "monster",
   "version": "0.1.0",
   "private": true,
   "packageManager": "pnpm@10.28.2",
@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
+    "@huggingface/transformers": "^3.8.1",
     "@prisma/adapter-pg": "7.4.2",
     "@prisma/client": "^7.4.2",
     "next": "16.1.6",
@@ -44,7 +45,9 @@
       "prisma",
       "@prisma/engines",
       "sharp",
-      "unrs-resolver"
+      "unrs-resolver",
+      "onnxruntime-node",
+      "protobufjs"
     ]
   }
 }

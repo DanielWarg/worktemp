@@ -22,7 +22,7 @@ pnpm db:studio        # Visual DB browser
 
 **Stack:** Next.js 16 (App Router) · React 19 · TypeScript · Prisma 7 · PostgreSQL (Neon) · Tailwind 4
 
-**Product:** Team Problem Radar — captures challenges during team meetings, detects patterns with AI, correlates with CRM data.
+**Product:** Mönster — captures challenges during team meetings, detects patterns with AI, correlates with CRM data. 100% local-first.
 
 ### Layout
 
