@@ -337,7 +337,7 @@ async function main() {
 
   // ─── A/B comparison with v3 ───
   if (COMPARE) {
-    const v3File = "/Users/evil/Desktop/EVIL/PROJEKT/worktemp/eval-real-data-v3.json";
+    const v3File = `${process.cwd()}/eval-real-data-v3.json`;
     if (existsSync(v3File)) {
       const v3Data = JSON.parse(readFileSync(v3File, "utf8"));
       console.log("\n" + "═".repeat(62));
@@ -392,7 +392,7 @@ async function main() {
 
   const outFile = POLISH_MODEL !== "none" ? `eval-real-data-v4-${POLISH_MODEL}.json` : "eval-real-data-v4.json";
   writeFileSync(
-    `/Users/evil/Desktop/EVIL/PROJEKT/worktemp/${outFile}`,
+    `${process.cwd()}/${outFile}`,
     JSON.stringify({
       timestamp: new Date().toISOString(),
       score,

@@ -1,7 +1,7 @@
 export async function GET() {
   return Response.json({
     ok: true,
-    service: "worktemp-web",
+    service: "monster",
     timestamp: new Date().toISOString(),
   });
 }

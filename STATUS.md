@@ -13,7 +13,7 @@
 - Produkten är domänagnostisk — fungerar för supportärenden, HR, telefonstatistik, mötesanteckningar
 - Frontend hämtar och skriver data via API (inte localStorage)
 - Demo-auth med fast account-id (riktig auth planeras i nästa steg)
-- GitHub-repo finns på `https://github.com/DanielWarg/worktemp`
+- GitHub-repo finns på `https://github.com/DanielWarg/monster`
 - CI/CD-grund är tillagd via GitHub Actions
 - Repo-säkerhet är förstärkt med secret-guardrails, PR-mall och workflow-dokumentation
 - GitHub-repoinställningar är delvis konfigurerade direkt remote

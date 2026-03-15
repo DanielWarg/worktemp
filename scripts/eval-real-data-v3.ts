@@ -391,7 +391,7 @@ async function main() {
 
   const outFile = POLISH_MODEL !== "none" ? `eval-real-data-v3-${POLISH_MODEL}.json` : "eval-real-data-v3.json";
   writeFileSync(
-    `/Users/evil/Desktop/EVIL/PROJEKT/worktemp/${outFile}`,
+    `${process.cwd()}/${outFile}`,
     JSON.stringify({
       timestamp: new Date().toISOString(),
       score,
