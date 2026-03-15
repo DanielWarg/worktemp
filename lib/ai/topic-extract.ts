@@ -9,37 +9,7 @@
  * necessarily the final human-facing label.
  */
 
-// ─── Stop words: Swedish + English ───
-const STOP_WORDS = new Set([
-  // Swedish
-  "och", "att", "det", "som", "för", "med", "har", "kan", "inte", "den",
-  "ett", "var", "från", "till", "ska", "vid", "nya", "alla", "efter",
-  "när", "utan", "eller", "men", "här", "där", "dess", "hade", "hon",
-  "han", "vara", "vill", "ser", "ang", "ärende", "ärenden", "ärendet",
-  "detta", "dessa", "behöver", "blir", "borde", "bara", "sedan",
-  "också", "redan", "mer", "mycket", "genom", "kunde", "skulle",
-  "samma", "andra", "hela", "igen", "flera", "dock", "vad", "hur",
-  // English
-  "the", "and", "for", "with", "not", "this", "that", "from", "has", "was",
-  "are", "have", "been", "will", "can", "new", "all", "about", "into",
-  "been", "just", "some", "than", "them", "then", "also", "only",
-  // Email prefixes
-  "fwd", "fw", "re", "sv", "vb",
-  // Ticket/email boilerplate
-  "angående", "gäller", "hej", "tack", "mvh", "mailto",
-  "ref", "service", "request", "incident",
-  "akut", "prio", "hög", "låg", "info", "information",
-  // Priority/status
-  "normal", "kritisk", "brådskande", "urgent",
-  "high", "medium", "low", "critical",
-  "öppen", "stängd", "löst", "closed", "open", "resolved",
-  // Generic ticket words
-  "okänd", "test", "prod", "server", "system", "problem",
-  "ärenderubrik", "felanmälan", "beställning",
-  "standardklient", "produktion", "klient",
-  "used", "free", "less", "more", "some", "like",
-  "need", "please", "want", "regarding",
-]);
+import { STOP_WORDS } from "./stop-words";
 
 export type TopicResult = {
   topics: string[];     // ranked by TF-IDF score
