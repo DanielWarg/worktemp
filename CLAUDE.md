@@ -28,9 +28,10 @@ pnpm db:studio        # Visual DB browser
 
 - `app/` — Pages and ~32 REST API routes. Landing page at `/`, workspace app at `/workspace`.
 - `components/workspace/` — All UI components. `workspace-shell.tsx` is the main container with view-mode state (`canvas | meeting | patterns | crm | history`).
-- `lib/ai/` — Two AI pipelines:
-  - **v3 (default for local):** Embedding-first, 95% deterministic. `pattern-detect-v3.ts` orchestrates: pre-classify → embed → cluster → entity-extract → sub-split → metadata → title-polish (Qwen2.5-7B via Ollama). No LLM needed for core analysis.
-  - **v1 (Claude API):** 4-step LLM pipeline: normalize → auto-tag → detect-patterns → suggest. Each step has `local-*.ts` variant.
+- `lib/ai/` — AI pipelines:
+  - **v4 (default for local):** Embedding-first, 95% deterministic. `pattern-detect-v4.ts` orchestrates: filter → embed (multilingual MiniLM) → cluster (max 12) → topic-extract (n-gram TF-IDF) → pattern-dedup (dual signal) → metadata (org-based scope) → title-polish (Qwen2.5-7B via Ollama, optional). No LLM needed for core analysis.
+  - **v3 (fallback):** Explicit opt-in via `pipelineVersion="v3"`. Uses entity-extract instead of topic-extract, includes sub-split step.
+  - **anthropic (cloud):** Claude Sonnet 4 via Anthropic API. Requires explicit opt-in due to data privacy.
 - `lib/db/prisma.ts` — Prisma singleton using `@prisma/adapter-pg` (not the default engine).
 - `lib/crm/` — Freshdesk/Zendesk/HubSpot adapters.
 - `generated/prisma/` — Auto-generated Prisma client (import from `@/generated/prisma/client`).
@@ -46,10 +47,12 @@ WorkspaceShell owns state and passes it down. Child components call `api()` help
 ### AI pipeline
 
 `POST /api/ai/analyze` with `{ workspaceId, steps[], provider, pipelineVersion? }`. Two providers:
-- `local` (default) → v3 pipeline. Single step "patterns". Embedding + entity extraction + clustering (deterministic, ~2s). Optional title polish via Qwen2.5-7B on Ollama port 11434 (~16s extra). Falls back to deterministic titles if Ollama unavailable.
-- `anthropic` → v1 pipeline. Four steps: normalize → tag → patterns → suggestions. Uses Claude Sonnet 4.
+- `local` (default) → v4 pipeline. Single step "patterns". Filter → embed → cluster → topic-extract → pattern-dedup → metadata → title-polish. Deterministic core (~2s), optional Ollama polish (~50s). Falls back to deterministic titles if Ollama unavailable. Embedding model: paraphrase-multilingual-MiniLM-L12-v2. Cluster defaults: targetMax=12, minCluster=3, threshold=0.42. Person removed from embedding text to prevent reporter-based clustering.
+- `anthropic` → Claude Sonnet 4. Cloud-only, explicit opt-in.
 
-Key v3 files: `pattern-detect-v3.ts` (orchestrator), `entity-extract.ts` (domain-agnostic), `sub-split.ts` (catch-all prevention), `trend-calc.ts` (scope/trend/confidence), `title-polish.ts` (LLM strategies).
+Key v4 files: `pattern-detect-v4.ts` (orchestrator), `topic-extract.ts` (n-gram TF-IDF), `pattern-dedup.ts` (dual signal dedup), `embed-challenges.ts` (multilingual embeddings), `cluster-challenges.ts` (agglomerative clustering), `trend-calc.ts` (scope/trend/confidence), `title-polish.ts` (LLM strategies), `pre-classify.ts` (ticket filter).
+
+v3 fallback files: `pattern-detect-v3.ts`, `entity-extract.ts`, `sub-split.ts`. Old `local-*.ts` variants and `micro-steps/` directory have been deleted.
 
 ## Conventions
 

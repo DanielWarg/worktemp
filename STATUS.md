@@ -4,9 +4,13 @@
 
 - `PLAN.md` omskriven till låst och skarpare Modul 1-spec
 - Projektets grundfiler skapade
-- Next.js 16-app med fungerande MVP: workspace, team, person, anteckningar
-- Prisma 7 kopplad mot Neon PostgreSQL med alla Modul 1-tabeller
-- REST API-lager med full CRUD för workspace, team, person, notes
+- Next.js 16-app med fungerande MVP: workspace, team, person, challenges, patterns, CRM
+- Prisma 7 kopplad mot Neon PostgreSQL med alla tabeller
+- REST API-lager med full CRUD för workspace, team, person, notes, challenges, patterns, meetings, CRM
+- AI pipeline v4 är default för lokal analys (embedding-first, 95% deterministisk, ~2s). v3 som fallback. v1/v2 och local-*.ts borttagna.
+- v4-flöde: Filter → Embed (multilingual MiniLM) → Cluster (max 12) → Topic Extract (n-gram TF-IDF) → Pattern Dedup (dual signal) → Metadata (org-based scope) → Title Polish (Qwen2.5-7B via Ollama, valfritt)
+- Mönstervyn har prioritetsrankning (critical/high/medium/low) och buggdetektering (röd "Bugg?" för upprepade identiska ärenden, orange "Granska" för cross-pattern-dubbletter)
+- Produkten är domänagnostisk — fungerar för supportärenden, HR, telefonstatistik, mötesanteckningar
 - Frontend hämtar och skriver data via API (inte localStorage)
 - Demo-auth med fast account-id (riktig auth planeras i nästa steg)
 - GitHub-repo finns på `https://github.com/DanielWarg/worktemp`
@@ -20,7 +24,7 @@
 - `Person` och `Account` hålls separata
 - Canvasen ska vara semi-strukturerad
 - Filuppladdning hålls enkel i första versionen
-- AI-funktioner förbereds i datamodellen men exponeras inte
+- AI v4-pipeline är default för lokal analys, Anthropic API för cloud
 - Vercel används som deploy-mål när appen scaffoldats
 - Vercel används som deploy-mål för den nya Next.js-appen
 - GitHub Actions är primär CI/CD-motor
@@ -34,7 +38,7 @@
 - personkort lever inom teamcontainrar och bär bara lätt information på canvas
 - detalj och kontext hör hemma i sidopanelen
 - fri whiteboard-logik är uttryckligen exkluderad
-- analys, trendning och kategorisering byggs inte i Modul 1
+- AI-driven analys, trendning och mönsterdetektion är implementerat via v4-pipeline
 - filhantering ska hållas smal: upload + metadata + kommentar
 
 ## Implementerat i repo:t
@@ -49,6 +53,15 @@
 - `lib/auth.ts` — demo-auth helper (fast account-id)
 - `components/workspace/workspace-shell.tsx`
   - interaktiv workspace-vy med API-driven state (ej localStorage)
+- `lib/ai/`
+  - v4 pipeline: `pattern-detect-v4.ts` (orchestrator), `topic-extract.ts`, `pattern-dedup.ts`, `embed-challenges.ts`, `cluster-challenges.ts`, `trend-calc.ts`, `title-polish.ts`, `pre-classify.ts`
+  - v3 fallback: `pattern-detect-v3.ts`, `entity-extract.ts`, `sub-split.ts`
+  - Embedding: paraphrase-multilingual-MiniLM-L12-v2 (384-dim)
+  - Borttaget: `local-*.ts`, `micro-steps/` katalog
+- `lib/crm/`
+  - Freshdesk, Zendesk, HubSpot-adapters
+- `scripts/`
+  - `eval-real-data-v4.ts`, `stress-test-v4.ts` — eval och stresstest för v4-pipeline
 - `package.json`
   - Next.js 16, React 19, Tailwind 4, TypeScript, Prisma och ESLint
 - `.nvmrc`, `.node-version`
@@ -177,8 +190,8 @@ Se implementation order i `PLAN.md`. Den är nu den primära källan för byggor
 ## Nästa byggsteg
 
 - Lägga till auth-flöde med NextAuth.js (ersätta demo-account)
+- Förbättra titelkvalitet i v4-pipeline
 - Bygga filuppladdning (presigned URL till S3/R2)
-- Bygga filkommentarer
 - Lägga till drag-and-drop för personkort och teamcontainrar
 - Polera onboarding-flöde (tomma tillstånd, guidning)
 - Lägga till autosave-debounce på inline-redigering
