@@ -1,11 +1,11 @@
 /**
  * Step 6: Polish pattern titles using LLM.
  *
- * Takes deterministic entity-based titles + sample tickets,
- * outputs readable Swedish titles.
+ * Two strategies:
+ * - Batch (JSON): One call for all titles. Works with Claude API.
+ * - Sequential (plaintext): One call per title. Works with small local models.
  *
  * This is the ONLY step that uses LLM, and it's optional.
- * Supports: Ollama (GPT-OSS, Ministral), llama.cpp, or skip.
  */
 
 import { sanitizeJson } from "./micro-steps/sanitize-json";
@@ -26,9 +26,77 @@ export type PolishedTitle = {
   fallbackUsed: boolean;
 };
 
+// ─── Sequential strategy (one title at a time, plaintext) ───
+
+const SEQ_SYSTEM = `Du är en svensk supportanalytiker. Du skriver korta rubriker.
+
+REGLER:
+- Max 60 tecken
+- Svenska
+- Beskriv PROBLEMET, inte bara systemet
+- Behåll systemnamn
+- Svara med BARA rubriken, inget annat`;
+
 /**
- * Polish all pattern titles in one batch call.
- * Falls back to original titles on any failure.
+ * Polish titles one at a time with plaintext output.
+ * Best for small local models (Qwen3-4B, Phi-4-mini etc).
+ */
+export async function polishTitlesSequential(
+  patterns: PatternForPolish[],
+  chatFn: ChatFn,
+): Promise<PolishedTitle[]> {
+  const results: PolishedTitle[] = [];
+
+  for (const p of patterns) {
+    const examples = p.evidence
+      .slice(0, 3)
+      .map((e) => `- "${e.text}"`)
+      .join("\n");
+
+    const userPrompt = `Nuvarande titel: "${p.title}"
+System: ${p.entities.slice(0, 3).join(", ") || "okänt"}
+${p.ticketCount} ärenden:
+${examples}
+
+Skriv en bättre rubrik:`;
+
+    try {
+      // Use higher max_tokens for thinking models (Qwen3 uses ~2000 tokens to think)
+      const raw = await chatFn(
+        [
+          { role: "system", content: SEQ_SYSTEM },
+          { role: "user", content: userPrompt },
+        ],
+        3000,
+      );
+
+      // Clean: strip thinking tags (Qwen3), quotes, extra lines
+      let title = raw
+        .replace(/<think>[\s\S]*?<\/think>/g, "")
+        .replace(/^[\s\n]+/, "")
+        .replace(/^["'`«»]+|["'`«»]+$/g, "")
+        .replace(/\n.*/g, "")
+        .trim();
+
+      // Validate: non-empty, reasonable length, not just the original
+      if (title.length > 0 && title.length <= 80 && title !== p.title) {
+        results.push({ original: p.title, polished: title, fallbackUsed: false });
+      } else {
+        results.push({ original: p.title, polished: p.title, fallbackUsed: true });
+      }
+    } catch {
+      results.push({ original: p.title, polished: p.title, fallbackUsed: true });
+    }
+  }
+
+  return results;
+}
+
+// ─── Batch strategy (JSON array, one call) ───
+
+/**
+ * Polish all titles in one batch call with JSON output.
+ * Best for capable models (Claude API, large models).
  */
 export async function polishTitles(
   patterns: PatternForPolish[],
@@ -36,7 +104,6 @@ export async function polishTitles(
 ): Promise<PolishedTitle[]> {
   if (patterns.length === 0) return [];
 
-  // Build prompt — all patterns in one call
   const patternDescriptions = patterns.map((p, i) => {
     const evidenceLines = p.evidence
       .slice(0, 3)
@@ -70,29 +137,18 @@ Exakt ${patterns.length} titlar, i samma ordning.`;
     );
 
     const cleaned = sanitizeJson(raw);
-
-    // Extract JSON array from response
     const arrayMatch = cleaned.match(/\[[\s\S]*\]/);
     if (!arrayMatch) {
-      console.warn("[title-polish] No JSON array found in response, using fallback");
+      console.warn("[title-polish] No JSON array in response, using fallback");
       return patterns.map((p) => ({ original: p.title, polished: p.title, fallbackUsed: true }));
     }
 
     const titles: string[] = JSON.parse(arrayMatch[0]);
 
-    if (!Array.isArray(titles) || titles.length !== patterns.length) {
-      console.warn(`[title-polish] Expected ${patterns.length} titles, got ${titles.length}, using fallback`);
-      return patterns.map((p, i) => ({
-        original: p.title,
-        polished: titles[i] && typeof titles[i] === "string" ? titles[i] : p.title,
-        fallbackUsed: !titles[i],
-      }));
-    }
-
     return patterns.map((p, i) => ({
       original: p.title,
-      polished: typeof titles[i] === "string" && titles[i].length > 0 ? titles[i] : p.title,
-      fallbackUsed: typeof titles[i] !== "string" || titles[i].length === 0,
+      polished: titles[i] && typeof titles[i] === "string" && titles[i].length > 0 ? titles[i] : p.title,
+      fallbackUsed: !titles[i] || typeof titles[i] !== "string",
     }));
   } catch (err) {
     console.error("[title-polish] LLM call failed:", err);

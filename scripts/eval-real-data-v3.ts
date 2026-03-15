@@ -17,7 +17,7 @@ import { classifyTicket, findDuplicates, type TicketClass } from "../lib/ai/pre-
 import { extractEntities, extractEntitiesFromTags, mergeEntities, discoverCorpusEntities, type ExtractedEntities } from "../lib/ai/entity-extract";
 import { subSplitCluster, type TicketWithEntities } from "../lib/ai/sub-split";
 import { calcTrend, calcScope, calcConfidence, type TrendType, type ScopeType, type ConfidenceLevel } from "../lib/ai/trend-calc";
-import { polishTitles, type PatternForPolish } from "../lib/ai/title-polish";
+import { polishTitles, polishTitlesSequential, type PatternForPolish } from "../lib/ai/title-polish";
 
 config({ path: new URL("../.env.local", import.meta.url).pathname });
 config({ path: new URL("../.env", import.meta.url).pathname });
@@ -266,8 +266,12 @@ async function main() {
       evidence: p.evidence,
     }));
 
-    const polished = await polishTitles(forPolish, chatFn);
-    llmCalls = 1;
+    // Use batch (JSON) for Claude, sequential (plaintext) for local models
+    const useSequential = POLISH_MODEL !== "claude";
+    const polished = useSequential
+      ? await polishTitlesSequential(forPolish, chatFn)
+      : await polishTitles(forPolish, chatFn);
+    llmCalls = useSequential ? forPolish.length : 1;
 
     for (let i = 0; i < patterns.length; i++) {
       if (!polished[i].fallbackUsed) {
@@ -422,6 +426,11 @@ async function buildChatFn(model: string): Promise<(msgs: ChatMessage[], maxToke
       const block = res.content[0];
       return block.type === "text" ? block.text : "";
     };
+  }
+
+  if (model === "qwen2.5-3b") {
+    const { ollamaChat } = await import("../lib/ai/ollama-client");
+    return (msgs, maxTokens) => ollamaChat(msgs, maxTokens, "qwen2.5:3b");
   }
 
   if (model === "gpt-oss") {
