@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 
+const VALID_STATUSES = new Set(["EMERGING", "CONFIRMED", "ADDRESSED", "DISMISSED"]);
+const VALID_TYPES = new Set(["RECURRING", "ESCALATING", "CROSS_PERSON", "CROSS_TEAM"]);
+
 // PATCH /api/patterns/:id — update pattern
 export async function PATCH(
   request: Request,
@@ -10,10 +13,20 @@ export async function PATCH(
   const body = await request.json();
 
   const data: Record<string, unknown> = {};
-  if (body.title !== undefined) data.title = body.title;
-  if (body.description !== undefined) data.description = body.description;
-  if (body.status !== undefined) data.status = body.status;
-  if (body.patternType !== undefined) data.patternType = body.patternType;
+  if (body.title !== undefined) data.title = String(body.title).slice(0, 200);
+  if (body.description !== undefined) data.description = String(body.description).slice(0, 2000);
+  if (body.status !== undefined) {
+    if (!VALID_STATUSES.has(body.status)) {
+      return NextResponse.json({ error: `Invalid status. Must be one of: ${[...VALID_STATUSES].join(", ")}` }, { status: 400 });
+    }
+    data.status = body.status;
+  }
+  if (body.patternType !== undefined) {
+    if (!VALID_TYPES.has(body.patternType)) {
+      return NextResponse.json({ error: `Invalid patternType. Must be one of: ${[...VALID_TYPES].join(", ")}` }, { status: 400 });
+    }
+    data.patternType = body.patternType;
+  }
 
   const pattern = await prisma.pattern.update({
     where: { id: patternId },
