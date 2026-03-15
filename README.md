@@ -1,13 +1,22 @@
-```
-               ·· ··
- _ __ ___   ___  _ __  ___| |_ ___ _ __
-| '_ ` _ \ / _ \| '_ \/ __| __/ _ \ '__|
-| | | | | | (_) | | | \__ \ ||  __/ |
-|_| |_| |_|\___/|_| |_|___/\__\___|_|
-               ¨  ¨
-```
+<h1 align="center">
+  <br>
+  MÖNSTER
+  <br>
+</h1>
 
-**See the patterns your team misses.**
+<p align="center">
+  <strong>See the patterns your team misses.</strong>
+</p>
+
+<p align="center">
+  <em>Local-first AI pattern detection. Your data never leaves your machine.</em>
+</p>
+
+<p align="center">
+  <code>capture → analyze → prioritize → act</code>
+</p>
+
+Mönster captures challenges during team meetings, detects recurring patterns with AI, and surfaces the problems that keep coming back — before they become crises.
 
 Mönster captures challenges during team meetings, detects recurring patterns with AI, and surfaces the problems that keep coming back — before they become crises.
 
