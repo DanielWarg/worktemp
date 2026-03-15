@@ -46,7 +46,7 @@ export function PatternView({ workspaceId, initialSystemContext, onBack }: Patte
   const [savingContext, setSavingContext] = useState(false);
   const [aiWarnings, setAiWarnings] = useState<string[]>([]);
   const [aiError, setAiError] = useState<string | null>(null);
-  const [groupBy, setGroupBy] = useState<"import" | "tag">("import");
+  const [groupBy, setGroupBy] = useState<"import" | "tag" | "priority">("import");
   const [showImport, setShowImport] = useState(false);
   const [imports, setImports] = useState<{ id: string; sourceLabel: string; parsedCount: number; createdAt: string }[]>([]);
   const [showImports, setShowImports] = useState(false);
@@ -193,6 +193,119 @@ export function PatternView({ workspaceId, initialSystemContext, onBack }: Patte
     await api(`/api/patterns/${patternId}`, { method: "DELETE" });
   }
 
+  // Detect patterns that may indicate a bug, misconfiguration, or repeated alarm.
+  // Two signals:
+  //   1. Cross-pattern: multiple patterns about the same system/topic (fragmented reports)
+  //   2. Within-pattern: many near-identical tickets in one pattern (same issue reported repeatedly)
+  type PatternFlag = {
+    type: "cross-pattern" | "repetition";
+    label: string;
+    detail: string;
+    relatedTitles?: string[];
+  };
+
+  const patternFlags = useMemo(() => {
+    const flags = new Map<string, PatternFlag>();
+
+    // ── Signal 1: Cross-pattern — same leading keyword or high topic overlap ──
+    const getLeadingWord = (title: string) => {
+      const dash = title.indexOf(" — ");
+      return (dash > 0 ? title.slice(0, dash) : title).toLowerCase().trim();
+    };
+    const getTopics = (desc: string | null): string[] => {
+      if (!desc) return [];
+      const m = desc.match(/Ämnen:\s*([^.]+)/);
+      return m ? m[1].split(",").map((t) => t.trim().toLowerCase()).filter(Boolean) : [];
+    };
+
+    for (let i = 0; i < patterns.length; i++) {
+      for (let j = i + 1; j < patterns.length; j++) {
+        const a = patterns[i], b = patterns[j];
+        const leadA = getLeadingWord(a.title);
+        const leadB = getLeadingWord(b.title);
+        const sameLeading = leadA.length > 2 && leadA === leadB;
+
+        const topicsA = getTopics(a.description);
+        const topicsB = getTopics(b.description);
+        let overlap = 0;
+        if (topicsA.length > 0 && topicsB.length > 0) {
+          const setB = new Set(topicsB);
+          const shared = topicsA.filter((t) => setB.has(t)).length;
+          const union = new Set([...topicsA, ...topicsB]).size;
+          overlap = union > 0 ? shared / union : 0;
+        }
+
+        if (sameLeading || overlap >= 0.5) {
+          const system = leadA.toUpperCase();
+          for (const p of [a, b]) {
+            const other = p === a ? b : a;
+            if (!flags.has(p.id)) {
+              flags.set(p.id, {
+                type: "cross-pattern",
+                label: "Återkommande problem",
+                detail: `Flera mönster om samma område (${system}) — kan tyda på en underliggande bugg eller felkonfiguration.`,
+                relatedTitles: [other.title],
+              });
+            } else {
+              const existing = flags.get(p.id)!;
+              if (existing.relatedTitles && !existing.relatedTitles.includes(other.title)) {
+                existing.relatedTitles.push(other.title);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // ── Signal 2: Within-pattern — near-identical tickets (same text repeated) ──
+    for (const pattern of patterns) {
+      if (pattern.patternChallenges.length < 3) continue;
+
+      const texts = pattern.patternChallenges.map((pc) =>
+        (pc.challenge.contentNormalized || pc.challenge.contentRaw || "")
+          .toLowerCase()
+          .replace(/\d+/g, "N")  // normalize numbers
+          .replace(/\s+/g, " ")
+          .trim()
+      );
+
+      // Count near-identical pairs (first 20 chars match = same template)
+      const prefixes = texts.map((t) => t.slice(0, 30));
+      const prefixCounts = new Map<string, number>();
+      for (const p of prefixes) {
+        if (p.length < 10) continue;
+        prefixCounts.set(p, (prefixCounts.get(p) || 0) + 1);
+      }
+      const maxRepeat = Math.max(...prefixCounts.values(), 0);
+      const repeatRatio = texts.length > 0 ? maxRepeat / texts.length : 0;
+
+      // Flag if ≥50% of tickets share the same prefix (likely same alarm/report)
+      if (maxRepeat >= 3 && repeatRatio >= 0.5) {
+        const existing = flags.get(pattern.id);
+        if (existing) {
+          // Upgrade: both signals = stronger flag
+          existing.type = "repetition";
+          existing.label = "Trolig bugg eller larmfel";
+          existing.detail = `${maxRepeat} av ${texts.length} ärenden är nästan identiska — troligen samma larm/fel som triggas upprepat. Granska om det är en bugg i systemet eller felkonfigurerat larm.`;
+        } else {
+          flags.set(pattern.id, {
+            type: "repetition",
+            label: "Trolig bugg eller larmfel",
+            detail: `${maxRepeat} av ${texts.length} ärenden är nästan identiska — troligen samma larm/fel som triggas upprepat. Granska om det är en bugg i systemet eller felkonfigurerat larm.`,
+          });
+        }
+      }
+    }
+
+    return flags;
+  }, [patterns]);
+
+  // Convenience: set of flagged pattern IDs for styling
+  const suspectedDuplicates = useMemo(
+    () => new Set(patternFlags.keys()),
+    [patternFlags]
+  );
+
   // Group patterns by their primary import (most common importId among linked challenges)
   const groupedPatterns = useMemo(() => {
     type ImportGroup = {
@@ -304,6 +417,84 @@ export function PatternView({ workspaceId, initialSystemContext, onBack }: Patte
       return a.tagName.localeCompare(b.tagName, "sv");
     });
   }, [patterns]);
+
+  // Priority scoring: combines all signals into a single score per pattern
+  const patternScores = useMemo(() => {
+    const scores = new Map<string, { score: number; level: "critical" | "high" | "medium" | "low"; reasons: string[] }>();
+
+    for (const pattern of patterns) {
+      let score = 0;
+      const reasons: string[] = [];
+
+      // Flag signals (strongest)
+      const flag = patternFlags.get(pattern.id);
+      if (flag?.type === "repetition") {
+        score += 40;
+        reasons.push("Upprepade identiska ärenden");
+      } else if (flag) {
+        score += 20;
+        reasons.push("Relaterade mönster finns");
+      }
+
+      // Trend
+      if (pattern.patternType === "ESCALATING") {
+        score += 30;
+        reasons.push("Eskalerande trend");
+      } else if (pattern.patternType === "CROSS_TEAM") {
+        score += 15;
+        reasons.push("Påverkar flera team");
+      } else if (pattern.patternType === "CROSS_PERSON") {
+        score += 10;
+        reasons.push("Flera rapportörer");
+      }
+
+      // Volume
+      const count = pattern.occurrenceCount;
+      if (count >= 10) {
+        score += 20;
+        reasons.push(`Hög volym (${count} ärenden)`);
+      } else if (count >= 5) {
+        score += 10;
+        reasons.push(`${count} ärenden`);
+      } else {
+        score += 3;
+      }
+
+      // Status: EMERGING = unaddressed = higher priority
+      if (pattern.status === "EMERGING") {
+        score += 5;
+      }
+
+      const level: "critical" | "high" | "medium" | "low" =
+        score >= 50 ? "critical" :
+        score >= 30 ? "high" :
+        score >= 15 ? "medium" : "low";
+
+      scores.set(pattern.id, { score, level, reasons });
+    }
+    return scores;
+  }, [patterns, patternFlags]);
+
+  // Group patterns by priority level
+  const priorityGroupedPatterns = useMemo(() => {
+    const levels = ["critical", "high", "medium", "low"] as const;
+    const labels: Record<string, string> = {
+      critical: "Kritisk",
+      high: "Hög prioritet",
+      medium: "Medium",
+      low: "Låg",
+    };
+
+    return levels
+      .map((level) => ({
+        level,
+        label: labels[level],
+        patterns: patterns
+          .filter((p) => patternScores.get(p.id)?.level === level)
+          .sort((a, b) => (patternScores.get(b.id)?.score ?? 0) - (patternScores.get(a.id)?.score ?? 0)),
+      }))
+      .filter((g) => g.patterns.length > 0);
+  }, [patterns, patternScores]);
 
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
@@ -425,6 +616,15 @@ export function PatternView({ workspaceId, initialSystemContext, onBack }: Patte
                 type="button"
               >
                 Per tagg
+              </button>
+              <button
+                className={`rounded-full px-3 py-1.5 text-[11px] font-semibold tracking-wide transition ${
+                  groupBy === "priority" ? "bg-white/15 text-white" : "text-white/40 hover:text-white/70"
+                }`}
+                onClick={() => setGroupBy("priority")}
+                type="button"
+              >
+                Prioritet
               </button>
             </div>
             <button
@@ -728,7 +928,14 @@ export function PatternView({ workspaceId, initialSystemContext, onBack }: Patte
                 </p>
               </div>
             ) : (
-              (groupBy === "tag"
+              (groupBy === "priority"
+                ? priorityGroupedPatterns.map((g) => ({
+                    key: g.level,
+                    label: g.label,
+                    sublabel: `${g.patterns.length} mönster`,
+                    patterns: g.patterns,
+                  }))
+                : groupBy === "tag"
                 ? tagGroupedPatterns.map((g) => ({
                     key: g.tagName ?? "__untagged__",
                     label: g.tagName ?? "Otaggade",
@@ -776,6 +983,10 @@ export function PatternView({ workspaceId, initialSystemContext, onBack }: Patte
                             className={`group/card flex w-full items-center rounded-xl border text-left transition ${
                               pattern.id === selectedPatternId
                                 ? "border-[var(--color-mint-400)]/40 bg-white/10"
+                                : patternFlags.get(pattern.id)?.type === "repetition"
+                                ? "border-red-400/50 bg-red-400/[0.06] hover:bg-red-400/10"
+                                : patternFlags.has(pattern.id)
+                                ? "border-[var(--color-copper-400)]/50 bg-[var(--color-copper-400)]/[0.06] hover:bg-[var(--color-copper-400)]/10"
                                 : "border-white/6 bg-white/[0.04] hover:bg-white/8"
                             }`}
                           >
@@ -808,6 +1019,22 @@ export function PatternView({ workspaceId, initialSystemContext, onBack }: Patte
                                       CRM
                                     </span>
                                   )}
+                                  {patternFlags.has(pattern.id) && (() => {
+                                    const flag = patternFlags.get(pattern.id)!;
+                                    const isBug = flag.type === "repetition";
+                                    return (
+                                      <span
+                                        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ${
+                                          isBug
+                                            ? "bg-red-400/20 text-red-400"
+                                            : "bg-[var(--color-copper-400)]/20 text-[var(--color-copper-400)]"
+                                        }`}
+                                        title={flag.detail}
+                                      >
+                                        {isBug ? "Bugg?" : "Granska"}
+                                      </span>
+                                    );
+                                  })()}
                                 </div>
                               </div>
                               <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
@@ -817,6 +1044,13 @@ export function PatternView({ workspaceId, initialSystemContext, onBack }: Patte
                                 <span className="text-[10px] uppercase tracking-[0.14em] text-white/40">
                                   {pattern.patternChallenges.length} utmaning{pattern.patternChallenges.length !== 1 ? "ar" : ""}
                                 </span>
+                                {groupBy === "priority" && patternScores.has(pattern.id) && (
+                                  <span className={`text-[10px] uppercase tracking-[0.14em] ${
+                                    {critical: "text-red-400", high: "text-[var(--color-copper-400)]", medium: "text-white/50", low: "text-white/30"}[patternScores.get(pattern.id)!.level]
+                                  }`}>
+                                    {patternScores.get(pattern.id)!.reasons[0]}
+                                  </span>
+                                )}
                               </div>
                             </button>
                             <button
@@ -850,6 +1084,44 @@ export function PatternView({ workspaceId, initialSystemContext, onBack }: Patte
                     {selectedPattern.description}
                   </p>
                 )}
+                {patternFlags.has(selectedPattern.id) && (() => {
+                  const flag = patternFlags.get(selectedPattern.id)!;
+                  const isBug = flag.type === "repetition";
+                  return (
+                    <div className={`mt-3 rounded-lg border px-3 py-2 ${
+                      isBug
+                        ? "border-red-400/40 bg-red-400/8"
+                        : "border-[var(--color-copper-500)]/30 bg-[var(--color-copper-500)]/8"
+                    }`}>
+                      <p className={`text-xs font-semibold ${isBug ? "text-red-600" : "text-[var(--color-copper-600)]"}`}>
+                        {flag.label}
+                      </p>
+                      <p className="mt-0.5 text-xs text-[var(--color-stone-600)]">
+                        {flag.detail}
+                      </p>
+                      {flag.relatedTitles && flag.relatedTitles.length > 0 && (
+                        <p className="mt-1 text-xs text-[var(--color-stone-500)]">
+                          Relaterade: {flag.relatedTitles.map((t) => `"${t}"`).join(", ")}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
+                {patternScores.has(selectedPattern.id) && (() => {
+                  const ps = patternScores.get(selectedPattern.id)!;
+                  const levelColors = { critical: "text-red-600", high: "text-[var(--color-copper-600)]", medium: "text-[var(--color-stone-600)]", low: "text-[var(--color-stone-400)]" };
+                  const levelLabels = { critical: "Kritisk", high: "Hög", medium: "Medium", low: "Låg" };
+                  return (
+                    <div className="mt-3 flex items-start gap-2">
+                      <span className={`text-xs font-semibold ${levelColors[ps.level]}`}>
+                        Prioritet: {levelLabels[ps.level]}
+                      </span>
+                      <span className="text-xs text-[var(--color-stone-500)]">
+                        — {ps.reasons.join(", ")}
+                      </span>
+                    </div>
+                  );
+                })()}
                 <div className="mt-4 flex flex-wrap gap-2">
                   {(["EMERGING", "CONFIRMED", "ADDRESSED", "DISMISSED"] as const).map(
                     (status) => (

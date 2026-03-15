@@ -96,7 +96,7 @@ export function classifyTicket(title: string, _tags: string[] = []): { ticketCla
     return { ticketClass: "administrative", isNoise: true };
   }
 
-  // Forwarded emails (check after others — a forwarded alert is still an alert)
+  // Forwarded emails — these are real incidents forwarded internally, not noise
   if (FORWARD_PATTERNS.some((p) => p.test(text))) {
     return { ticketClass: "forwarded_email", isNoise: false };
   }

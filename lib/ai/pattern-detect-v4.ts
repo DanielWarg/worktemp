@@ -22,9 +22,9 @@
 import { prisma } from "@/lib/db/prisma";
 import { classifyTicket, findDuplicates, type TicketClass } from "./pre-classify";
 import { clusterChallenges, type ClusterOptions } from "./cluster-challenges";
-import { extractCorpusTopics, aggregateClusterTopics, type TopicResult } from "./topic-extract";
+import { extractCorpusTopics, aggregateClusterTopics } from "./topic-extract";
 import { deduplicatePatterns } from "./pattern-dedup";
-import { calcTrend, calcScopeByOrg, calcScope, calcConfidence, type TrendType, type ScopeType, type ConfidenceLevel } from "./trend-calc";
+import { calcTrend, calcScopeByOrg, calcConfidence, type TrendType, type ScopeType, type ConfidenceLevel } from "./trend-calc";
 import { polishWithSuggestions, type PatternForPolish } from "./title-polish";
 
 type PatternResult = {

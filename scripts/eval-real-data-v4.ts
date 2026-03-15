@@ -14,10 +14,10 @@ import { config } from "dotenv";
 import { embedChallenges, type ChallengeForEmbed } from "../lib/ai/embed-challenges";
 import { clusterChallenges, type ClusterOptions } from "../lib/ai/cluster-challenges";
 import { classifyTicket, findDuplicates, type TicketClass } from "../lib/ai/pre-classify";
-import { extractCorpusTopics, aggregateClusterTopics, type TopicResult } from "../lib/ai/topic-extract";
+import { extractCorpusTopics, aggregateClusterTopics } from "../lib/ai/topic-extract";
 import { deduplicatePatterns } from "../lib/ai/pattern-dedup";
-import { calcTrend, calcScope, calcScopeByOrg, calcConfidence, type TrendType, type ScopeType, type ConfidenceLevel } from "../lib/ai/trend-calc";
-import { polishTitlesSequential, polishWithSuggestions, type PatternForPolish } from "../lib/ai/title-polish";
+import { calcTrend, calcScopeByOrg, calcConfidence, type ScopeType, type ConfidenceLevel } from "../lib/ai/trend-calc";
+import { polishWithSuggestions, type PatternForPolish } from "../lib/ai/title-polish";
 
 config({ path: new URL("../.env.local", import.meta.url).pathname });
 config({ path: new URL("../.env", import.meta.url).pathname });
@@ -255,7 +255,7 @@ async function main() {
   if (coreTickets.length < 3) { console.log("För få ärenden."); return; }
 
   const opts: ClusterOptions = {}; // Use defaults (0.42 threshold)
-  const { embedMs, clusters, patterns, mergeCount, ticketTopics, ticketTextsMap } = await runPipeline(tickets, coreTickets, opts);
+  const { embedMs, clusters, patterns, mergeCount, ticketTextsMap } = await runPipeline(tickets, coreTickets, opts);
 
   // ─── Title polish (optional) ───
   let llmCalls = 0;

@@ -18,6 +18,8 @@ export type PatternForPolish = {
   entities: string[];
   ticketCount: number;
   evidence: { text: string; person: string }[];
+  /** All ticket texts in the cluster (not just evidence sample) */
+  allTicketTexts?: string[];
 };
 
 export type PolishedTitle = {
@@ -32,7 +34,7 @@ const SEQ_SYSTEM = `Du är en svensk supportanalytiker. Du skriver korta rubrike
 
 REGLER:
 - Max 60 tecken
-- Svenska
+- Skriv ALLTID på svenska. ALDRIG norska, danska eller engelska.
 - Beskriv PROBLEMET, inte bara systemet
 - Behåll systemnamn
 - Svara med BARA rubriken, inget annat`;
@@ -48,15 +50,21 @@ export async function polishTitlesSequential(
   const results: PolishedTitle[] = [];
 
   for (const p of patterns) {
-    const examples = p.evidence
-      .slice(0, 3)
-      .map((e) => `- "${e.text}"`)
+    const allTexts = p.allTicketTexts && p.allTicketTexts.length > 0
+      ? p.allTicketTexts
+      : p.evidence.map((e) => e.text);
+
+    const ticketLines = allTexts
+      .map((t) => `- "${t}"`)
       .join("\n");
 
+    const keywords = extractClusterKeywords(allTexts);
+    const keywordLine = keywords.length > 0 ? `\nNyckelord: ${keywords.join(", ")}` : "";
+
     const userPrompt = `Nuvarande titel: "${p.title}"
-System: ${p.entities.slice(0, 3).join(", ") || "okänt"}
+System: ${p.entities.slice(0, 3).join(", ") || "okänt"}${keywordLine}
 ${p.ticketCount} ärenden:
-${examples}
+${ticketLines}
 
 Skriv en bättre rubrik:`;
 
@@ -71,7 +79,7 @@ Skriv en bättre rubrik:`;
       );
 
       // Clean: strip thinking tags (Qwen3), quotes, extra lines
-      let title = raw
+      const title = raw
         .replace(/<think>[\s\S]*?<\/think>/g, "")
         .replace(/^[\s\n]+/, "")
         .replace(/^["'`«»]+|["'`«»]+$/g, "")
@@ -103,11 +111,15 @@ export type PolishResult = {
 
 const COMBINED_SYSTEM = `Du är en svensk supportanalytiker. Du hjälper teamledare förstå mönster i supportärenden.
 
-Du får ett mönster med system-entiteter och exempelärenden. Svara med exakt två rader:
-RAD 1: En kort rubrik (max 60 tecken, svenska, beskriv problemet)
-RAD 2: Ett kort åtgärdsförslag (max 120 tecken, svenska, konkret nästa steg)
+Du får ett mönster med system-entiteter, nyckelord och ALLA ärenden i gruppen. Svara med exakt två rader:
+RAD 1: En kort rubrik (max 60 tecken, beskriv PROBLEMET, inte bara systemet)
+RAD 2: Ett kort åtgärdsförslag (max 120 tecken, konkret nästa steg)
 
-Svara med BARA dessa två rader, inget annat.`;
+REGLER:
+- Skriv ALLTID på svenska. ALDRIG norska, danska eller engelska.
+- Rubriken ska sammanfatta vad ärendena har gemensamt — det underliggande problemet
+- Behåll systemnamn (t.ex. TIMS, PubTrans) om de finns
+- Svara med BARA dessa två rader, inget annat`;
 
 /**
  * Polish title + generate suggestion in one call per pattern.
@@ -120,15 +132,23 @@ export async function polishWithSuggestions(
   const results: PolishResult[] = [];
 
   for (const p of patterns) {
-    const examples = p.evidence
-      .slice(0, 3)
-      .map((e) => `- "${e.text}"`)
+    // Use ALL ticket texts if available, otherwise fall back to evidence sample
+    const allTexts = p.allTicketTexts && p.allTicketTexts.length > 0
+      ? p.allTicketTexts
+      : p.evidence.map((e) => e.text);
+
+    const ticketLines = allTexts
+      .map((t) => `- "${t}"`)
       .join("\n");
 
+    // Extract common keywords from all tickets for extra context
+    const keywords = extractClusterKeywords(allTexts);
+    const keywordLine = keywords.length > 0 ? `\nNyckelord: ${keywords.join(", ")}` : "";
+
     const userPrompt = `Mönster: "${p.title}"
-System: ${p.entities.slice(0, 3).join(", ") || "okänt"}
+System: ${p.entities.slice(0, 3).join(", ") || "okänt"}${keywordLine}
 ${p.ticketCount} ärenden:
-${examples}`;
+${ticketLines}`;
 
     try {
       const raw = await chatFn(
@@ -176,6 +196,39 @@ ${examples}`;
   return results;
 }
 
+// ─── Keyword extraction for cluster context ───
+
+const KEYWORD_STOP = new Set([
+  "och", "att", "det", "som", "för", "med", "har", "kan", "inte", "den",
+  "ett", "var", "från", "till", "ska", "vid", "nya", "alla", "efter",
+  "när", "utan", "eller", "men", "här", "där", "dess", "hade", "hon",
+  "han", "vara", "vill", "ser", "ang", "ärende", "ärenden", "ärendet",
+  "detta", "dessa", "behöver", "blir", "borde", "bara", "sedan",
+  "the", "and", "for", "with", "not", "this", "that", "from", "has",
+  "problem", "fel", "fråga", "info", "angående", "gäller", "hej", "tack",
+]);
+
+/** Extract top keywords that appear in ≥40% of texts (TF-IDF-like) */
+function extractClusterKeywords(texts: string[]): string[] {
+  if (texts.length < 2) return [];
+  const docFreq = new Map<string, number>();
+  for (const text of texts) {
+    const words = new Set(
+      text.toLowerCase()
+        .replace(/["""''`]/g, "")
+        .split(/\s+/)
+        .filter((w) => w.length > 3 && !KEYWORD_STOP.has(w) && !/^\d+$/.test(w))
+    );
+    for (const w of words) docFreq.set(w, (docFreq.get(w) || 0) + 1);
+  }
+  const threshold = Math.ceil(texts.length * 0.4);
+  return [...docFreq.entries()]
+    .filter(([, count]) => count >= threshold && count < texts.length) // common but not universal
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([word]) => word);
+}
+
 // ─── Batch strategy (JSON array, one call) ───
 
 /**
@@ -189,22 +242,27 @@ export async function polishTitles(
   if (patterns.length === 0) return [];
 
   const patternDescriptions = patterns.map((p, i) => {
-    const evidenceLines = p.evidence
-      .slice(0, 3)
-      .map((e) => `  - "${e.text}" (${e.person})`)
+    const allTexts = p.allTicketTexts && p.allTicketTexts.length > 0
+      ? p.allTicketTexts
+      : p.evidence.map((e) => e.text);
+    const ticketLines = allTexts
+      .map((t) => `  - "${t}"`)
       .join("\n");
+    const keywords = extractClusterKeywords(allTexts);
+    const keywordLine = keywords.length > 0 ? `\n   Nyckelord: ${keywords.join(", ")}` : "";
     return `${i + 1}. Nuvarande: "${p.title}"
-   System: ${p.entities.length > 0 ? p.entities.slice(0, 3).join(", ") : "okänt"}
-   ${p.ticketCount} ärenden. Exempel:
-${evidenceLines}`;
+   System: ${p.entities.length > 0 ? p.entities.slice(0, 3).join(", ") : "okänt"}${keywordLine}
+   ${p.ticketCount} ärenden:
+${ticketLines}`;
   }).join("\n\n");
 
-  const systemPrompt = `Du är en teknisk skribent. Du får en lista med automatiskt genererade mönster-titlar från en supportanalys. Varje titel har system-entiteter och exempelärenden.
+  const systemPrompt = `Du är en teknisk skribent. Du får en lista med automatiskt genererade mönster-titlar från en supportanalys. Varje titel har system-entiteter, nyckelord och alla ärenden.
 
 Skriv en kort, läsbar svensk titel (max 60 tecken) för varje mönster som:
 - Beskriver PROBLEMET, inte bara systemet
 - Är specifik nog att en teamleader förstår vad det handlar om
 - Behåller systemnamnet om det finns
+- ALLTID på svenska. ALDRIG norska, danska eller engelska.
 
 Svara med JSON-array: ["titel1", "titel2", ...]
 Exakt ${patterns.length} titlar, i samma ordning.`;
