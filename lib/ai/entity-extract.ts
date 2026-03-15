@@ -25,30 +25,7 @@ const ACTION_PATTERNS = ACTIONS.map((a) => ({
   pattern: new RegExp(`\\b${a}\\b`, "i"),
 }));
 
-// ─── Stop words: never entities ───
-const STOP_WORDS = new Set([
-  // Swedish
-  "och", "att", "det", "som", "för", "med", "har", "kan", "inte", "den",
-  "ett", "var", "från", "till", "ska", "vid", "nya", "alla", "efter",
-  "när", "utan", "eller", "men", "här", "där", "dess", "hade", "hon",
-  "han", "vara", "vill", "ser", "ang", "ärende", "ärenden", "ärendet",
-  "detta", "dessa", "behöver", "blir", "borde", "bara", "sedan",
-  // English
-  "the", "and", "for", "with", "not", "this", "that", "from", "has", "was",
-  "are", "have", "been", "will", "can", "new", "all", "about", "into",
-  // Email prefixes (always noise in tickets)
-  "fwd", "fw", "re", "sv", "vb",
-  // Ticket/email boilerplate
-  "angående", "gäller", "hej", "tack", "mvh", "mailto",
-  "ref", "service", "request", "ärende", "incident", "problem",
-  "akut", "prio", "hög", "låg", "info", "information",
-  // Generic words that look like proper nouns but aren't
-  "okänd", "test", "prod", "dev", "staging", "server",
-  // Priority/status labels (common in ticket systems)
-  "normal", "hög", "låg", "kritisk", "brådskande", "urgent",
-  "high", "medium", "low", "critical",
-  "öppen", "stängd", "löst", "closed", "open", "resolved",
-]);
+import { STOP_WORDS } from "./stop-words";
 
 export type ExtractedEntities = {
   systems: string[];

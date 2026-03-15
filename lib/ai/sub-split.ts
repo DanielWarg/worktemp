@@ -5,6 +5,7 @@
  */
 
 import { type ExtractedEntities } from "./entity-extract";
+import { EMBED_DIM } from "./embed-challenges";
 
 export type TicketWithEntities = {
   id: string;
@@ -186,7 +187,7 @@ function forceHalve(
   if (tickets.length <= MAX_CLUSTER_SIZE) return [tickets];
 
   // Compute centroid
-  const dim = 384;
+  const dim = EMBED_DIM;
   const centroid = new Float32Array(dim);
   let count = 0;
   for (const t of tickets) {

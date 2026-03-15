@@ -206,17 +206,9 @@ ${ticketLines}`;
   return results;
 }
 
-// ─── Keyword extraction for cluster context ───
+import { STOP_WORDS } from "./stop-words";
 
-const KEYWORD_STOP = new Set([
-  "och", "att", "det", "som", "för", "med", "har", "kan", "inte", "den",
-  "ett", "var", "från", "till", "ska", "vid", "nya", "alla", "efter",
-  "när", "utan", "eller", "men", "här", "där", "dess", "hade", "hon",
-  "han", "vara", "vill", "ser", "ang", "ärende", "ärenden", "ärendet",
-  "detta", "dessa", "behöver", "blir", "borde", "bara", "sedan",
-  "the", "and", "for", "with", "not", "this", "that", "from", "has",
-  "problem", "fel", "fråga", "info", "angående", "gäller", "hej", "tack",
-]);
+// ─── Keyword extraction for cluster context ───
 
 /** Extract top keywords that appear in ≥40% of texts (TF-IDF-like) */
 function extractClusterKeywords(texts: string[]): string[] {
@@ -227,7 +219,7 @@ function extractClusterKeywords(texts: string[]): string[] {
       text.toLowerCase()
         .replace(/["""''`]/g, "")
         .split(/\s+/)
-        .filter((w) => w.length > 3 && !KEYWORD_STOP.has(w) && !/^\d+$/.test(w))
+        .filter((w) => w.length > 3 && !STOP_WORDS.has(w) && !/^\d+$/.test(w))
     );
     for (const w of words) docFreq.set(w, (docFreq.get(w) || 0) + 1);
   }

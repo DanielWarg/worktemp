@@ -4,6 +4,7 @@
  */
 
 export const EMBED_MODEL = "Xenova/paraphrase-multilingual-MiniLM-L12-v2";
+export const EMBED_DIM = 384;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let pipelinePromise: Promise<any> | null = null;
@@ -59,7 +60,7 @@ export async function embedChallenges(
 
   // Extract vectors from the output tensor
   for (let i = 0; i < toEmbed.length; i++) {
-    const vec = Array.from((output[i].data ?? output.data.slice(i * 384, (i + 1) * 384)) as Float32Array);
+    const vec = Array.from((output[i].data ?? output.data.slice(i * EMBED_DIM, (i + 1) * EMBED_DIM)) as Float32Array);
     cache.set(toEmbed[i].id, vec);
     result.set(toEmbed[i].id, vec);
   }

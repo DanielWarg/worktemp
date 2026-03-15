@@ -6,7 +6,7 @@
  * (e.g. "TIMS inloggning" vs "TIMS diskutrymme").
  */
 
-const EMBED_DIM = 384;
+import { EMBED_DIM } from "./embed-challenges";
 
 export function deduplicatePatterns<T extends {
   ticketIds: string[];
