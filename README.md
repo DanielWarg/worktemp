@@ -87,7 +87,7 @@ pnpm dev
 
 ```sql
 INSERT INTO "Account" (id, email, name, "createdAt", "updatedAt")
-VALUES ('demo-account-001', 'demo@worktemp.app', 'Demo User', NOW(), NOW())
+VALUES ('demo-account-001', 'demo@monster.app', 'Demo User', NOW(), NOW())
 ON CONFLICT (id) DO NOTHING;
 ```
 

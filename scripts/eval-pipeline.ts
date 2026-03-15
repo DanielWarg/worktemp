@@ -565,7 +565,7 @@ async function main() {
   }
 
   // Save
-  const outPath = "/Users/evil/Desktop/EVIL/PROJEKT/worktemp/eval-pipeline-results.json";
+  const outPath = `${process.cwd()}/eval-pipeline-results.json`;
   writeFileSync(outPath, JSON.stringify({ timestamp: new Date().toISOString(), models: allResults }, null, 2));
   console.log(`\nSparad: ${outPath}`);
 }
