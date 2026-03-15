@@ -1,22 +1,32 @@
 /**
- * Eval on real HPTS data — deterministic pipeline v3.
+ * Eval on real HPTS data — deterministic pipeline v3 + optional title polish.
  *
  * Usage:
- *   npx tsx scripts/eval-real-data-v3.ts
- *
- * No LLM required. ~5s total.
+ *   npx tsx scripts/eval-real-data-v3.ts                    # No LLM (deterministic only)
+ *   npx tsx scripts/eval-real-data-v3.ts --polish claude    # Title polish via Claude API
+ *   npx tsx scripts/eval-real-data-v3.ts --polish gpt-oss   # Title polish via Ollama GPT-OSS
+ *   npx tsx scripts/eval-real-data-v3.ts --polish ministral # Title polish via llama.cpp Ministral
  */
 
 import * as XLSX from "xlsx";
 import { writeFileSync } from "fs";
+import { config } from "dotenv";
 import { embedChallenges, type ChallengeForEmbed } from "../lib/ai/embed-challenges";
 import { clusterChallenges } from "../lib/ai/cluster-challenges";
 import { classifyTicket, findDuplicates, type TicketClass } from "../lib/ai/pre-classify";
 import { extractEntities, extractEntitiesFromTags, mergeEntities, discoverCorpusEntities, type ExtractedEntities } from "../lib/ai/entity-extract";
 import { subSplitCluster, type TicketWithEntities } from "../lib/ai/sub-split";
 import { calcTrend, calcScope, calcConfidence, type TrendType, type ScopeType, type ConfidenceLevel } from "../lib/ai/trend-calc";
+import { polishTitles, type PatternForPolish } from "../lib/ai/title-polish";
+
+config({ path: new URL("../.env.local", import.meta.url).pathname });
+config({ path: new URL("../.env", import.meta.url).pathname });
 
 const XLSX_PATH = "/Users/evil/Downloads/Skapade ärenden förra månaden 2026_03_13 11-06-2 8.xlsx";
+
+// Parse --polish flag
+const polishIdx = process.argv.indexOf("--polish");
+const POLISH_MODEL = polishIdx >= 0 ? (process.argv[polishIdx + 1] || "none") : "none";
 
 type Ticket = { id: string; person: string; tags: string[]; text: string };
 
@@ -241,15 +251,44 @@ async function main() {
     }
   }
 
+  // ─── Step 6: Title polish (optional) ───
+  let llmCalls = 0;
+  let polishFallbacks = 0;
+
+  if (POLISH_MODEL !== "none") {
+    console.log(`\nStep 6: Title polish via ${POLISH_MODEL}...`);
+
+    const chatFn = await buildChatFn(POLISH_MODEL);
+    const forPolish: PatternForPolish[] = patterns.map((p) => ({
+      title: p.title,
+      entities: p.entities,
+      ticketCount: p.ticketIds.length,
+      evidence: p.evidence,
+    }));
+
+    const polished = await polishTitles(forPolish, chatFn);
+    llmCalls = 1;
+
+    for (let i = 0; i < patterns.length; i++) {
+      if (!polished[i].fallbackUsed) {
+        console.log(`  "${patterns[i].title}" → "${polished[i].polished}"`);
+        patterns[i].title = polished[i].polished;
+      } else {
+        polishFallbacks++;
+      }
+    }
+    console.log(`  ${patterns.length - polishFallbacks}/${patterns.length} polished, ${polishFallbacks} fallbacks`);
+  }
+
   const elapsed = Date.now() - t0;
 
   // ─── Results ───
-  console.log(`  ${patterns.length} patterns\n`);
+  console.log(`\n  ${patterns.length} patterns\n`);
   console.log("═".repeat(62));
   console.log("RESULTAT");
   console.log("═".repeat(62));
   console.log(`Tid: ${(elapsed / 1000).toFixed(1)}s total (embed: ${(embedMs / 1000).toFixed(1)}s)`);
-  console.log(`LLM: 0 calls\n`);
+  console.log(`LLM: ${llmCalls} calls (title polish: ${POLISH_MODEL})${polishFallbacks ? `, ${polishFallbacks} fallbacks` : ""}\n`);
 
   const coveredIds = new Set(patterns.flatMap((p) => p.ticketIds));
   const coverage = coveredIds.size / coreTickets.length;
@@ -324,7 +363,9 @@ async function main() {
     duplicates: dupeCount,
     ticketReuse: reused,
     totalDurationMs: elapsed,
-    llmCalls: 0,
+    polishModel: POLISH_MODEL,
+    llmCalls,
+    polishFallbacks,
     clusters: clusters.length,
     groups: meaningfulGroups.length,
     scope: scopeC,
@@ -339,7 +380,7 @@ async function main() {
   console.log("═".repeat(62));
   console.log(JSON.stringify(score, null, 2));
 
-  const outFile = "eval-real-data-v3.json";
+  const outFile = POLISH_MODEL !== "none" ? `eval-real-data-v3-${POLISH_MODEL}.json` : "eval-real-data-v3.json";
   writeFileSync(
     `/Users/evil/Desktop/EVIL/PROJEKT/worktemp/${outFile}`,
     JSON.stringify({
@@ -360,6 +401,41 @@ async function main() {
     }, null, 2)
   );
   console.log(`\nSparad: ${outFile}`);
+}
+
+type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
+
+async function buildChatFn(model: string): Promise<(msgs: ChatMessage[], maxTokens: number) => Promise<string>> {
+  if (model === "claude") {
+    // Use Anthropic SDK
+    const { default: Anthropic } = await import("@anthropic-ai/sdk");
+    const client = new Anthropic();
+    return async (msgs, maxTokens) => {
+      const systemMsg = msgs.find((m) => m.role === "system");
+      const userMsgs = msgs.filter((m) => m.role !== "system");
+      const res = await client.messages.create({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: maxTokens,
+        system: systemMsg?.content || "",
+        messages: userMsgs.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
+      });
+      const block = res.content[0];
+      return block.type === "text" ? block.text : "";
+    };
+  }
+
+  if (model === "gpt-oss") {
+    const { ollamaChat } = await import("../lib/ai/ollama-client");
+    return (msgs, maxTokens) => ollamaChat(msgs, maxTokens, "gpt-oss:20b");
+  }
+
+  if (model === "ministral") {
+    const { localChat } = await import("../lib/ai/local-client");
+    process.env.LOCAL_LLM_URL = process.env.LOCAL_LLM_URL || "http://127.0.0.1:8081";
+    return (msgs, maxTokens) => localChat(msgs, maxTokens);
+  }
+
+  throw new Error(`Unknown polish model: ${model}. Use: claude, gpt-oss, ministral`);
 }
 
 main().catch(console.error);
