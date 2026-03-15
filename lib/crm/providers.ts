@@ -1,5 +1,7 @@
 // CRM provider adapters — fetch ticket counts by category
 
+const MAX_PAGES = 10; // Safety cap to prevent infinite loops
+
 export type CrmTicketCategory = {
   category: string;
   ticketCount: number;
@@ -8,44 +10,54 @@ export type CrmTicketCategory = {
 
 export type CrmSyncResult = {
   categories: CrmTicketCategory[];
+  totalFetched?: number;
   error?: string;
 };
 
+function groupByCategory(
+  tickets: { category: string }[],
+): CrmTicketCategory[] {
+  const groups = new Map<string, number>();
+  for (const t of tickets) {
+    groups.set(t.category, (groups.get(t.category) ?? 0) + 1);
+  }
+  return Array.from(groups.entries()).map(([category, ticketCount]) => ({
+    category,
+    ticketCount,
+  }));
+}
+
 async function syncFreshdesk(
   baseUrl: string,
-  apiKey: string
+  apiKey: string,
 ): Promise<CrmSyncResult> {
-  // Freshdesk API: GET /api/v2/tickets with filters
   const headers = {
     Authorization: `Basic ${btoa(apiKey + ":X")}`,
     "Content-Type": "application/json",
   };
 
   try {
-    // Get tickets updated in last 30 days
     const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-    const url = `${baseUrl}/api/v2/tickets?updated_since=${since}&per_page=100`;
-    const res = await fetch(url, { headers });
+    const allTickets: { category: string }[] = [];
+    let page = 1;
 
-    if (!res.ok) {
-      return { categories: [], error: `Freshdesk API ${res.status}` };
+    while (page <= MAX_PAGES) {
+      const url = `${baseUrl}/api/v2/tickets?updated_since=${since}&per_page=100&page=${page}`;
+      const res = await fetch(url, { headers });
+
+      if (!res.ok) {
+        return { categories: groupByCategory(allTickets), totalFetched: allTickets.length, error: `Freshdesk API ${res.status} on page ${page}` };
+      }
+
+      const tickets = (await res.json()) as { type: string | null }[];
+      if (tickets.length === 0) break;
+
+      for (const t of tickets) allTickets.push({ category: t.type || "Övrigt" });
+      if (tickets.length < 100) break; // last page
+      page++;
     }
 
-    const tickets = (await res.json()) as { type: string | null; created_at: string }[];
-
-    // Group by type
-    const groups = new Map<string, number>();
-    for (const ticket of tickets) {
-      const cat = ticket.type || "Övrigt";
-      groups.set(cat, (groups.get(cat) ?? 0) + 1);
-    }
-
-    return {
-      categories: Array.from(groups.entries()).map(([category, ticketCount]) => ({
-        category,
-        ticketCount,
-      })),
-    };
+    return { categories: groupByCategory(allTickets), totalFetched: allTickets.length };
   } catch (err) {
     return { categories: [], error: String(err) };
   }
@@ -53,9 +65,8 @@ async function syncFreshdesk(
 
 async function syncZendesk(
   baseUrl: string,
-  apiKey: string
+  apiKey: string,
 ): Promise<CrmSyncResult> {
-  // Zendesk API: search tickets
   const headers = {
     Authorization: `Bearer ${apiKey}`,
     "Content-Type": "application/json",
@@ -65,30 +76,27 @@ async function syncZendesk(
     const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
       .toISOString()
       .split("T")[0];
-    const url = `${baseUrl}/api/v2/search.json?query=type:ticket created>${since}`;
-    const res = await fetch(url, { headers });
+    const allTickets: { category: string }[] = [];
+    let url: string | null = `${baseUrl}/api/v2/search.json?query=type:ticket created>${since}&per_page=100`;
+    let pages = 0;
 
-    if (!res.ok) {
-      return { categories: [], error: `Zendesk API ${res.status}` };
+    while (url && pages < MAX_PAGES) {
+      const res = await fetch(url, { headers });
+      if (!res.ok) {
+        return { categories: groupByCategory(allTickets), totalFetched: allTickets.length, error: `Zendesk API ${res.status}` };
+      }
+
+      const data = (await res.json()) as {
+        results: { tags: string[] }[];
+        next_page: string | null;
+      };
+
+      for (const t of data.results) allTickets.push({ category: t.tags[0] || "Övrigt" });
+      url = data.next_page;
+      pages++;
     }
 
-    const data = (await res.json()) as {
-      results: { tags: string[]; created_at: string }[];
-    };
-
-    // Group by first tag as category
-    const groups = new Map<string, number>();
-    for (const ticket of data.results) {
-      const cat = ticket.tags[0] || "Övrigt";
-      groups.set(cat, (groups.get(cat) ?? 0) + 1);
-    }
-
-    return {
-      categories: Array.from(groups.entries()).map(([category, ticketCount]) => ({
-        category,
-        ticketCount,
-      })),
-    };
+    return { categories: groupByCategory(allTickets), totalFetched: allTickets.length };
   } catch (err) {
     return { categories: [], error: String(err) };
   }
@@ -96,40 +104,49 @@ async function syncZendesk(
 
 async function syncHubspot(
   _baseUrl: string,
-  apiKey: string
+  apiKey: string,
 ): Promise<CrmSyncResult> {
-  // HubSpot API: search tickets
   const headers = {
     Authorization: `Bearer ${apiKey}`,
     "Content-Type": "application/json",
   };
 
   try {
-    const res = await fetch(
-      "https://api.hubapi.com/crm/v3/objects/tickets?limit=100&properties=hs_pipeline_stage,subject,createdate",
-      { headers }
-    );
+    const allTickets: { category: string }[] = [];
+    let after: string | undefined;
+    let pages = 0;
 
-    if (!res.ok) {
-      return { categories: [], error: `HubSpot API ${res.status}` };
+    while (pages < MAX_PAGES) {
+      const params = new URLSearchParams({
+        limit: "100",
+        properties: "hs_pipeline_stage,subject,createdate",
+      });
+      if (after) params.set("after", after);
+
+      const res = await fetch(
+        `https://api.hubapi.com/crm/v3/objects/tickets?${params}`,
+        { headers },
+      );
+
+      if (!res.ok) {
+        return { categories: groupByCategory(allTickets), totalFetched: allTickets.length, error: `HubSpot API ${res.status}` };
+      }
+
+      const data = (await res.json()) as {
+        results: { properties: { hs_pipeline_stage: string } }[];
+        paging?: { next?: { after: string } };
+      };
+
+      for (const t of data.results) {
+        allTickets.push({ category: t.properties.hs_pipeline_stage || "Övrigt" });
+      }
+
+      after = data.paging?.next?.after;
+      if (!after || data.results.length < 100) break;
+      pages++;
     }
 
-    const data = (await res.json()) as {
-      results: { properties: { hs_pipeline_stage: string; subject: string } }[];
-    };
-
-    const groups = new Map<string, number>();
-    for (const ticket of data.results) {
-      const cat = ticket.properties.hs_pipeline_stage || "Övrigt";
-      groups.set(cat, (groups.get(cat) ?? 0) + 1);
-    }
-
-    return {
-      categories: Array.from(groups.entries()).map(([category, ticketCount]) => ({
-        category,
-        ticketCount,
-      })),
-    };
+    return { categories: groupByCategory(allTickets), totalFetched: allTickets.length };
   } catch (err) {
     return { categories: [], error: String(err) };
   }
