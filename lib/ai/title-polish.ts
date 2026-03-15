@@ -92,6 +92,90 @@ Skriv en bättre rubrik:`;
   return results;
 }
 
+// ─── Combined: title + suggestion in one call (for production pipeline) ───
+
+export type PolishResult = {
+  original: string;
+  polished: string;
+  suggestion: string;
+  fallbackUsed: boolean;
+};
+
+const COMBINED_SYSTEM = `Du är en svensk supportanalytiker. Du hjälper teamledare förstå mönster i supportärenden.
+
+Du får ett mönster med system-entiteter och exempelärenden. Svara med exakt två rader:
+RAD 1: En kort rubrik (max 60 tecken, svenska, beskriv problemet)
+RAD 2: Ett kort åtgärdsförslag (max 120 tecken, svenska, konkret nästa steg)
+
+Svara med BARA dessa två rader, inget annat.`;
+
+/**
+ * Polish title + generate suggestion in one call per pattern.
+ * Used in production pipeline with Qwen2.5-7B.
+ */
+export async function polishWithSuggestions(
+  patterns: PatternForPolish[],
+  chatFn: ChatFn,
+): Promise<PolishResult[]> {
+  const results: PolishResult[] = [];
+
+  for (const p of patterns) {
+    const examples = p.evidence
+      .slice(0, 3)
+      .map((e) => `- "${e.text}"`)
+      .join("\n");
+
+    const userPrompt = `Mönster: "${p.title}"
+System: ${p.entities.slice(0, 3).join(", ") || "okänt"}
+${p.ticketCount} ärenden:
+${examples}`;
+
+    try {
+      const raw = await chatFn(
+        [
+          { role: "system", content: COMBINED_SYSTEM },
+          { role: "user", content: userPrompt },
+        ],
+        200,
+      );
+
+      const cleaned = raw
+        .replace(/<think>[\s\S]*?<\/think>/g, "")
+        .replace(/^[\s\n]+/, "")
+        .trim();
+
+      const lines = cleaned.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
+
+      const title = lines[0]
+        ?.replace(/^["'`«»\d.)\s]+/, "")
+        .replace(/["'`«»]+$/, "")
+        .replace(/^(rubrik|titel|rad\s*1)[:\s]*/i, "")
+        .trim();
+
+      const suggestion = lines[1]
+        ?.replace(/^["'`«»\d.)\s]+/, "")
+        .replace(/["'`«»]+$/, "")
+        .replace(/^(förslag|åtgärd|rad\s*2)[:\s]*/i, "")
+        .trim();
+
+      if (title && title.length > 0 && title.length <= 80) {
+        results.push({
+          original: p.title,
+          polished: title,
+          suggestion: suggestion || "",
+          fallbackUsed: false,
+        });
+      } else {
+        results.push({ original: p.title, polished: p.title, suggestion: suggestion || "", fallbackUsed: true });
+      }
+    } catch {
+      results.push({ original: p.title, polished: p.title, suggestion: "", fallbackUsed: true });
+    }
+  }
+
+  return results;
+}
+
 // ─── Batch strategy (JSON array, one call) ───
 
 /**

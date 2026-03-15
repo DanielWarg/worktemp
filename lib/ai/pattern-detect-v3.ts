@@ -18,6 +18,7 @@ import { clusterChallenges } from "./cluster-challenges";
 import { extractEntities, extractEntitiesFromTags, mergeEntities, discoverCorpusEntities, type ExtractedEntities } from "./entity-extract";
 import { subSplitCluster, type TicketWithEntities } from "./sub-split";
 import { calcTrend, calcScope, calcConfidence, type TrendType, type ScopeType, type ConfidenceLevel } from "./trend-calc";
+import { polishWithSuggestions, type PatternForPolish } from "./title-polish";
 
 type PatternResult = {
   title: string;
@@ -29,6 +30,7 @@ type PatternResult = {
   confidence: ConfidenceLevel;
   entities: string[];
   evidence: { text: string; person: string }[];
+  suggestion: string;
 };
 
 export async function detectPatternsV3(workspaceId: string) {
@@ -216,8 +218,9 @@ export async function detectPatternsV3(workspaceId: string) {
         person: ticketPersons.get(t.id) || "Okänd",
       }));
 
-    // Description: summarize the group
-    const entityList = sortedSystems.map(([s, c]) => `${s} (${c})`).join(", ");
+    // Description: summarize the group (top 3 entities only)
+    const topEntities = sortedSystems.slice(0, 3);
+    const entityList = topEntities.map(([s, c]) => `${s} (${c})`).join(", ");
     const description = [
       `${group.length} ärenden`,
       entityList ? `System: ${entityList}` : null,
@@ -237,8 +240,9 @@ export async function detectPatternsV3(workspaceId: string) {
       scope,
       trend,
       confidence,
-      entities: sortedSystems.map(([s]) => s),
+      entities: topEntities.map(([s]) => s),
       evidence,
+      suggestion: "",
     });
   }
 
@@ -264,6 +268,45 @@ export async function detectPatternsV3(workspaceId: string) {
 
   console.log(`[v3] Step 5: ${patterns.length} patterns with metadata`);
 
+  // ─── Step 6: Title polish + suggestions (optional, via Ollama) ───
+  let llmCalls = 0;
+  try {
+    const ollamaCheck = await fetch("http://127.0.0.1:11434/api/tags", {
+      signal: AbortSignal.timeout(2000),
+    });
+    if (ollamaCheck.ok) {
+      const { ollamaChat } = await import("./ollama-client");
+      const chatFn = (msgs: { role: "system" | "user" | "assistant"; content: string }[], maxTokens: number) =>
+        ollamaChat(msgs, maxTokens, "qwen2.5:7b");
+
+      const forPolish: PatternForPolish[] = patterns.map((p) => ({
+        title: p.title,
+        entities: p.entities,
+        ticketCount: p.ticketIds.length,
+        evidence: p.evidence,
+      }));
+
+      const polished = await polishWithSuggestions(forPolish, chatFn);
+      llmCalls = polished.length;
+      let polishCount = 0;
+
+      for (let i = 0; i < patterns.length; i++) {
+        if (!polished[i].fallbackUsed) {
+          patterns[i].title = polished[i].polished;
+          polishCount++;
+        }
+        if (polished[i].suggestion) {
+          patterns[i].suggestion = polished[i].suggestion;
+        }
+      }
+      console.log(`[v3] Step 6: ${polishCount}/${patterns.length} titles polished, ${llmCalls} LLM calls`);
+    } else {
+      console.log("[v3] Step 6: Ollama not available, using deterministic titles");
+    }
+  } catch {
+    console.log("[v3] Step 6: Ollama not available, using deterministic titles");
+  }
+
   // Log distributions
   const scopeDist = countBy(patterns, (p) => p.scope);
   const trendDist = countBy(patterns, (p) => p.trend);
@@ -282,7 +325,7 @@ export async function detectPatternsV3(workspaceId: string) {
     if (existingTitles.has(p.title.toLowerCase())) continue;
     if (p.ticketIds.length < 2) continue;
 
-    await prisma.pattern.create({
+    const pattern = await prisma.pattern.create({
       data: {
         workspaceId,
         title: p.title,
@@ -296,6 +339,18 @@ export async function detectPatternsV3(workspaceId: string) {
         },
       },
     });
+
+    if (p.suggestion) {
+      await prisma.suggestion.create({
+        data: {
+          patternId: pattern.id,
+          content: p.suggestion,
+          source: "AI_GENERATED",
+          status: "PENDING",
+        },
+      });
+    }
+
     created++;
   }
 
@@ -312,7 +367,7 @@ export async function detectPatternsV3(workspaceId: string) {
     groups: meaningfulGroups.length,
     patterns: patterns.length,
     coverage: Math.round(coverage * 100),
-    llmCalls: 0,
+    llmCalls,
     coreTickets: coreTickets.length,
     noiseFiltered: challenges.length - coreTickets.length,
     elapsed,
