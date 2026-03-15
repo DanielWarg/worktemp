@@ -28,7 +28,9 @@ pnpm db:studio        # Visual DB browser
 
 - `app/` — Pages and ~32 REST API routes. Landing page at `/`, workspace app at `/workspace`.
 - `components/workspace/` — All UI components. `workspace-shell.tsx` is the main container with view-mode state (`canvas | meeting | patterns | crm | history`).
-- `lib/ai/` — 4-step AI pipeline: normalize → auto-tag → detect-patterns → suggest. Each step has a Claude variant and a `local-*.ts` variant for offline Ministral.
+- `lib/ai/` — Two AI pipelines:
+  - **v3 (default for local):** Embedding-first, 95% deterministic. `pattern-detect-v3.ts` orchestrates: pre-classify → embed → cluster → entity-extract → sub-split → metadata → title-polish (Qwen2.5-7B via Ollama). No LLM needed for core analysis.
+  - **v1 (Claude API):** 4-step LLM pipeline: normalize → auto-tag → detect-patterns → suggest. Each step has `local-*.ts` variant.
 - `lib/db/prisma.ts` — Prisma singleton using `@prisma/adapter-pg` (not the default engine).
 - `lib/crm/` — Freshdesk/Zendesk/HubSpot adapters.
 - `generated/prisma/` — Auto-generated Prisma client (import from `@/generated/prisma/client`).
@@ -43,7 +45,11 @@ WorkspaceShell owns state and passes it down. Child components call `api()` help
 
 ### AI pipeline
 
-`POST /api/ai/analyze` with `{ workspaceId, steps[], provider }`. Runs steps sequentially in batches. Each step has error counting (`failedBatches`) and the response includes `warnings[]`. Two providers: `anthropic` (Claude Sonnet 4) and `local` (Ministral via llama.cpp on port 8081).
+`POST /api/ai/analyze` with `{ workspaceId, steps[], provider, pipelineVersion? }`. Two providers:
+- `local` (default) → v3 pipeline. Single step "patterns". Embedding + entity extraction + clustering (deterministic, ~2s). Optional title polish via Qwen2.5-7B on Ollama port 11434 (~16s extra). Falls back to deterministic titles if Ollama unavailable.
+- `anthropic` → v1 pipeline. Four steps: normalize → tag → patterns → suggestions. Uses Claude Sonnet 4.
+
+Key v3 files: `pattern-detect-v3.ts` (orchestrator), `entity-extract.ts` (domain-agnostic), `sub-split.ts` (catch-all prevention), `trend-calc.ts` (scope/trend/confidence), `title-polish.ts` (LLM strategies).
 
 ## Conventions
 
