@@ -7,6 +7,9 @@ import { generateSuggestions } from "@/lib/ai/suggest";
 import { detectPatternsV3 } from "@/lib/ai/pattern-detect-v3";
 import { detectPatternsV4 } from "@/lib/ai/pattern-detect-v4";
 
+// Prevent concurrent analysis for the same workspace
+const runningAnalyses = new Set<string>();
+
 // POST /api/ai/analyze — run AI analysis pipeline for a workspace
 // provider: "anthropic" (default) or "local" (v4 pipeline, fully local)
 // pipelineVersion: "v3" for explicit fallback
@@ -14,9 +17,22 @@ export async function POST(request: Request) {
   const body = await request.json();
   const { workspaceId, steps, provider = "anthropic", systemContext, pipelineVersion } = body;
 
-  if (!workspaceId) {
+  if (!workspaceId || typeof workspaceId !== "string") {
     return NextResponse.json({ error: "workspaceId is required" }, { status: 400 });
   }
+
+  const validSteps = new Set(["normalize", "tag", "patterns", "suggestions"]);
+  if (steps && (!Array.isArray(steps) || steps.some((s: unknown) => !validSteps.has(s as string)))) {
+    return NextResponse.json({ error: `Invalid steps. Must be array of: ${[...validSteps].join(", ")}` }, { status: 400 });
+  }
+
+  if (runningAnalyses.has(workspaceId)) {
+    return NextResponse.json(
+      { error: "Analys pågår redan för denna workspace. Vänta tills den är klar." },
+      { status: 409 }
+    );
+  }
+  runningAnalyses.add(workspaceId);
 
   // Resolve context: explicit param > workspace field > empty
   let ctx = typeof systemContext === "string" ? systemContext.trim() : "";
@@ -64,6 +80,8 @@ export async function POST(request: Request) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("[ai/analyze] Pipeline-fel:", err);
     return NextResponse.json({ error: message, results, warnings, provider }, { status: 502 });
+  } finally {
+    runningAnalyses.delete(workspaceId);
   }
 
   return NextResponse.json({ ...results, warnings });
